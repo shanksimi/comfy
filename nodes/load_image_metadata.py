@@ -173,5 +173,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LoadImageMetadata": "Load Image Metadata",
+    "LoadImageMetadata": "Load Image Metadata (shanksimi)",
 }
