@@ -37,13 +37,15 @@ Sau đó khởi động lại ComfyUI.
 ```
 comfy/
 ├── __init__.py              # Entry point đăng ký node cho ComfyUI
-├── load_image_metadata.py   # Node: Load Image Metadata
-├── wildcard_encode.py       # Node: Mã hóa Wildcard (Impact)
-├── requirements.txt         # Python dependencies
 ├── install.py               # Script chạy sau khi cài (tùy chọn)
 ├── node_list.json           # Metadata cho ComfyUI-Manager (tùy chọn)
+├── requirements.txt         # Python dependencies
 ├── .gitignore
-└── README.md
+├── README.md
+└── nodes/                   # Thư mục chứa custom nodes
+    ├── __init__.py
+    ├── load_image_metadata.py   # Node: Load Image Metadata
+    └── wildcard_encode.py       # Node: Mã hóa Wildcard (Impact)
 ```
 
 ## Đăng ký vào ComfyUI-Manager (để xuất hiện trong danh sách cài tự động)
