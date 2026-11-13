@@ -8,8 +8,8 @@
     "license": "MIT",
     "tags": ["image", "metadata", "vietnamese"]
   },
-  "ImpactWildcardEncode": {
-    "display_name": "Mã hóa Wildcard (Impact)",
+  "ShankWildcardEncode": {
+    "display_name": "Shank Wildcard Encode",
     "description": "Thay thế các mẫu {a|b|c} trong prompt bằng giá trị ngẫu nhiên. Hỗ trợ seed và đọc file wildcard.",
     "authors": ["shanksimi"],
     "contact": "",
@@ -17,8 +17,8 @@
     "license": "MIT",
     "tags": ["text", "wildcard", "prompt", "impact", "vietnamese"]
   },
-  "Seed": {
-    "display_name": "Seed",
+  "ShankSeed": {
+    "display_name": "Shank Seed",
     "description": "Cung cấp seed cho KSampler: fixed, random, increment, decrement.",
     "authors": ["shanksimi"],
     "contact": "",

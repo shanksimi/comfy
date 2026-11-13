@@ -8,7 +8,7 @@ Hỗ trợ: seed cố định, random seed, tăng/giảm seed, và nút copy/pas
 import random
 
 
-class Seed:
+class ShankSeed:
     """
     Seed Node.
     Cung cấp giá trị seed cho KSampler và các node khác cần seed.
@@ -54,9 +54,9 @@ class Seed:
 
 # Đăng ký node
 NODE_CLASS_MAPPINGS = {
-    "Seed": Seed,
+    "ShankSeed": ShankSeed,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "Seed": "Seed (shanksimi)",
+    "ShankSeed": "Shank Seed (shanksimi)",
 }

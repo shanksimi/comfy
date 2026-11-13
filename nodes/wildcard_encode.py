@@ -1,5 +1,5 @@
 """
-Impact Wildcard Encode - Node xử lý wildcard trong prompt (Tiếng Việt)
+Shank Wildcard Encode - Node xử lý wildcard trong prompt (Tiếng Việt)
 
 Chức năng tương tự ImpactWildcardEncode của Impact Pack:
 Thay thế các mẫu {a|b|c} trong prompt bằng một giá trị ngẫu nhiên.
@@ -19,9 +19,9 @@ import random
 import folder_paths
 
 
-class ImpactWildcardEncode:
+class ShankWildcardEncode:
     """
-    Mã hóa Wildcard (Impact).
+    Shank Wildcard Encode.
     Thay thế các mẫu {a|b|c} trong prompt bằng một giá trị ngẫu nhiên.
     """
 
@@ -91,9 +91,9 @@ class ImpactWildcardEncode:
 
 # Đăng ký node
 NODE_CLASS_MAPPINGS = {
-    "ImpactWildcardEncode": ImpactWildcardEncode,
+    "ShankWildcardEncode": ShankWildcardEncode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImpactWildcardEncode": "Wildcard Encode (shanksimi)",
+    "ShankWildcardEncode": "Shank Wildcard Encode (shanksimi)",
 }
