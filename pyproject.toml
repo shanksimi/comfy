@@ -1,0 +1,16 @@
+[project]
+name = "comfyui-shanksimi"
+description = "Bộ custom node cho ComfyUI: đọc metadata ảnh, mã hóa wildcard prompt, seed."
+version = "1.0.0"
+license = { text = "MIT" }
+authors = [{ name = "shanksimi" }]
+requires-python = ">=3.9"
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/shanksimi/comfy"
+
+[tool.comfy]
+PublisherId = "shanksimi"
+DisplayName = "ComfyUI-shanksimi"
+Icon = ""

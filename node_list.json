@@ -16,5 +16,14 @@
     "website": "",
     "license": "MIT",
     "tags": ["text", "wildcard", "prompt", "impact", "vietnamese"]
+  },
+  "Seed": {
+    "display_name": "Seed",
+    "description": "Cung cấp seed cho KSampler: fixed, random, increment, decrement.",
+    "authors": ["shanksimi"],
+    "contact": "",
+    "website": "",
+    "license": "MIT",
+    "tags": ["seed", "utils", "vietnamese"]
   }
 }

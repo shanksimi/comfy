@@ -31,21 +31,24 @@ Sau đó khởi động lại ComfyUI.
 |------|-------|
 | `Load Image Metadata` | Trích xuất metadata (EXIF, GPS, PNG info, kích thước, định dạng) từ file ảnh. Có nút **Xoá ảnh**. |
 | `Mã hóa Wildcard (Impact)` | Thay thế các mẫu `{a|b|c}` trong prompt bằng giá trị ngẫu nhiên. Hỗ trợ seed và ô hiển thị kết quả. |
+| `Seed` | Cung cấp seed cho KSampler: fixed, random, increment, decrement. |
 
 ## Cấu trúc repo
 
 ```
 comfy/
-├── __init__.py              # Entry point đăng ký node cho ComfyUI
+├── __init__.py              # Entry point đăng ký node cho ComfyUI (metadata @author/@title/...)
 ├── install.py               # Script chạy sau khi cài (tùy chọn)
-├── node_list.json           # Metadata cho ComfyUI-Manager (tùy chọn)
+├── node_list.json           # Danh sách node (cho scanner của ComfyUI-Manager)
+├── pyproject.toml           # Metadata cho ComfyUI Registry / Manager
 ├── requirements.txt         # Python dependencies
 ├── .gitignore
 ├── README.md
 └── nodes/                   # Thư mục chứa custom nodes
     ├── __init__.py
     ├── load_image_metadata.py   # Node: Load Image Metadata
-    └── wildcard_encode.py       # Node: Mã hóa Wildcard (Impact)
+    ├── wildcard_encode.py       # Node: Mã hóa Wildcard (Impact)
+    └── seed.py                  # Node: Seed
 ```
 
 ## Đăng ký vào ComfyUI-Manager (để xuất hiện trong danh sách cài tự động)
@@ -58,12 +61,12 @@ comfy/
 
 ```json
 {
-  "title": "Tên hiển thị của node",
-  "name": "comfy",
-  "files": ["https://github.com/shanksimi/comfy.git"],
-  "install_type": "git",
-  "description": "Mô tả ngắn gọn về node của bạn",
-  "pip": [],
+  "author": "shanksimi",
+  "title": "ComfyUI-shanksimi",
+  "reference": "https://github.com/shanksimi/comfy",
+  "files": ["https://github.com/shanksimi/comfy"],
+  "install_type": "git-clone",
+  "description": "Bộ custom node cho ComfyUI: đọc metadata ảnh, mã hóa wildcard prompt, seed.",
   "tags": ["image", "text", "vietnamese"]
 }
 ```
