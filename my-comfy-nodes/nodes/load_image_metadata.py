@@ -42,6 +42,7 @@ def _get_gps_info(exif_data):
 class LoadImageMetadata:
     """
     Load metadata từ một file ảnh (EXIF, PNG text chunks, kích thước, định dạng, ...).
+    Có nút "Xoá ảnh" để reset đường dẫn ảnh hiện tại.
     """
 
     @classmethod
@@ -59,6 +60,7 @@ class LoadImageMetadata:
         return {
             "required": {
                 "image_path": ("STRING", {"default": "", "multiline": False}),
+                "clear_image": ("BOOLEAN", {"default": False, "label_on": "Xoá ảnh", "label_off": ""}),
             },
             "optional": {
                 "select_from_input": (["false"] + files,),
@@ -71,7 +73,11 @@ class LoadImageMetadata:
     CATEGORY = "image/metadata"
     OUTPUT_NODE = False
 
-    def load_metadata(self, image_path="", select_from_input="false"):
+    def load_metadata(self, image_path="", clear_image=False, select_from_input="false"):
+        # Nếu bật nút Xoá ảnh, reset đường dẫn về rỗng
+        if clear_image:
+            image_path = ""
+
         # Nếu người dùng chọn từ danh sách input folder, ưu tiên chọn đó
         if select_from_input and select_from_input != "false":
             image_path = os.path.join(folder_paths.get_input_directory(), select_from_input)
@@ -80,7 +86,7 @@ class LoadImageMetadata:
             empty = "{}"
             return (
                 empty,
-                "Không tìm thấy file ảnh hoặc chưa cung cấp đường dẫn.",
+                "Chưa cung cấp đường dẫn ảnh hoặc đã xoá ảnh.",
                 0,
                 0,
                 "",
