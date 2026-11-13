@@ -1,0 +1,4 @@
+# Thêm các thư viện Python cần thiết cho custom nodes tại đây
+# Ví dụ:
+# pillow>=9.0.0
+# numpy>=1.24.0

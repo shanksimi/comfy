@@ -1,0 +1,11 @@
+{
+  "SaveImagePlus": {
+    "display_name": "Save Image Plus (Custom)",
+    "description": "Lưu ảnh đầu ra với tên file tùy chọn và thư mục output",
+    "authors": ["Your Name"],
+    "contact": "",
+    "website": "",
+    "license": "MIT",
+    "tags": ["image", "save"]
+  }
+}
