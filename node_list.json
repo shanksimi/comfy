@@ -1,12 +1,12 @@
 {
-  "LoadImageMetadata": {
-    "display_name": "Load Image Metadata",
-    "description": "Trích xuất metadata (EXIF, GPS, PNG info, kích thước, định dạng) từ file ảnh. Có nút Xoá ảnh.",
+  "LoadImageWithMetadata": {
+    "display_name": "Load Image + Metadata",
+    "description": "Load ảnh + đọc metadata (A1111/ComfyUI), chọn nhiều ảnh, vẽ mask. Output: IMAGE, MASK, POSITIVE, NEGATIVE, METADATA, FILENAME, FOLDER.",
     "authors": ["shanksimi"],
     "contact": "",
     "website": "",
     "license": "MIT",
-    "tags": ["image", "metadata", "vietnamese"]
+    "tags": ["image", "metadata", "mask", "vietnamese"]
   },
   "ShankWildcardEncode": {
     "display_name": "Shank Wildcard Encode",

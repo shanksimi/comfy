@@ -29,7 +29,7 @@ Sau đó khởi động lại ComfyUI.
 
 | Node | Mô tả |
 |------|-------|
-| `Load Image Metadata` | Trích xuất metadata (EXIF, GPS, PNG info, kích thước, định dạng) từ file ảnh. Có nút **Xoá ảnh**. |
+| `Load Image + Metadata` | Load ảnh + đọc metadata (A1111/ComfyUI), chọn nhiều ảnh, vẽ mask. Output: IMAGE, MASK, POSITIVE, NEGATIVE, METADATA, FILENAME, FOLDER. |
 | `Shank Wildcard Encode` | Thay thế các mẫu `{a|b|c}` trong prompt bằng giá trị ngẫu nhiên. Hỗ trợ seed và ô hiển thị kết quả. |
 | `Shank Seed` | Cung cấp seed cho KSampler: fixed, random, increment, decrement. |
 
@@ -46,7 +46,7 @@ comfy/
 ├── README.md
 └── nodes/                   # Thư mục chứa custom nodes
     ├── __init__.py
-    ├── load_image_metadata.py   # Node: Load Image Metadata
+    ├── load_image_metadata.py   # Node: Load Image + Metadata
     ├── wildcard_encode.py       # Node: Shank Wildcard Encode
     └── seed.py                  # Node: Shank Seed
 ```
