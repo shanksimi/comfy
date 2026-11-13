@@ -4,6 +4,12 @@ Impact Wildcard Encode - Node xử lý wildcard trong prompt (Tiếng Việt)
 Chức năng tương tự ImpactWildcardEncode của Impact Pack:
 Thay thế các mẫu {a|b|c} trong prompt bằng một giá trị ngẫu nhiên.
 Hỗ trợ đọc danh sách từ file trong thư mục wildcards/ nếu có.
+
+Giao diện:
+  - Ô trên (text): Nhập prompt chứa wildcard.
+  - Ô dưới (display_text): Ô HIỂN THỊ KẾT QUẢ sau khi xử lý.
+    * Bạn KHÔNG CẦN nhập vào ô này.
+    * Kết quả thực sự được trả về qua socket output (text).
 """
 
 import os
@@ -24,6 +30,10 @@ class ImpactWildcardEncode:
         return {
             "required": {
                 "text": ("STRING", {"default": "", "multiline": True}),
+                "display_text": ("STRING", {
+                    "default": "📋 KẾT QUẢ SAU XỬ LÝ SẼ HIỂN THỊ TẠI ĐÂY\n(Không cần nhập vào ô này - chỉ dùng để xem kết quả)",
+                    "multiline": True,
+                }),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
             },
         }
@@ -34,7 +44,8 @@ class ImpactWildcardEncode:
     CATEGORY = "text/impact"
     OUTPUT_NODE = False
 
-    def encode(self, text, seed=0):
+    def encode(self, text, display_text="", seed=0):
+        # display_text là ô hiển thị mặc định, không được dùng làm input thực tế
         if not text:
             return ("",)
 
