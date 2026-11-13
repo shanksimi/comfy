@@ -1,11 +1,20 @@
 {
-  "SaveImagePlus": {
-    "display_name": "Save Image Plus (Custom)",
-    "description": "Lưu ảnh đầu ra với tên file tùy chọn và thư mục output",
-    "authors": ["Your Name"],
+  "LoadImageMetadata": {
+    "display_name": "Load Image Metadata",
+    "description": "Trích xuất metadata (EXIF, GPS, PNG info, kích thước, định dạng) từ file ảnh. Có nút Xoá ảnh.",
+    "authors": ["shanksimi"],
     "contact": "",
     "website": "",
     "license": "MIT",
-    "tags": ["image", "save"]
+    "tags": ["image", "metadata", "vietnamese"]
+  },
+  "ImpactWildcardEncode": {
+    "display_name": "Mã hóa Wildcard (Impact)",
+    "description": "Thay thế các mẫu {a|b|c} trong prompt bằng giá trị ngẫu nhiên. Hỗ trợ seed và đọc file wildcard.",
+    "authors": ["shanksimi"],
+    "contact": "",
+    "website": "",
+    "license": "MIT",
+    "tags": ["text", "wildcard", "prompt", "impact", "vietnamese"]
   }
 }
