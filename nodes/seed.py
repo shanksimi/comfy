@@ -58,5 +58,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "Seed": "Seed (rgthree-style) - shanksimi",
+    "Seed": "Seed (shanksimi)",
 }

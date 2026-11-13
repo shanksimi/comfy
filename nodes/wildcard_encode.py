@@ -95,5 +95,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImpactWildcardEncode": "Wildcard Encode (Impact) - shanksimi",
+    "ImpactWildcardEncode": "Wildcard Encode (shanksimi)",
 }
