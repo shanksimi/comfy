@@ -9,6 +9,10 @@ from .ultimate_sd_upscale import ShankUltimateSDUpscale
 from .batch_to_image import ShankBatchToImage
 from .face_detailer import ShankFaceDetailer, ShankHanDetailer
 from .ultralytics_detector import ShankUltralyticsDetectorProvider
+from .image_saver_simple import ShankImageSaverSimple
+from .image_comparer import ShankImageComparer
+from .power_lora_loader import ShankPowerLoraLoader
+from .basic_info import ShankBasicInfo
 
 NODE_CLASS_MAPPINGS = {**_META_NODE_MAPPINGS, **_WILDCARD_NODE_MAPPINGS, **_SEED_NODE_MAPPINGS, **_LLLITE_NODE_MAPPINGS}
 NODE_DISPLAY_NAME_MAPPINGS = {**_META_DISPLAY_MAPPINGS, **_WILDCARD_DISPLAY_MAPPINGS, **_SEED_DISPLAY_MAPPINGS, **_LLLITE_DISPLAY_MAPPINGS}
@@ -36,5 +40,17 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankHanDetailer"] = "HandDetailer (shanksimi)"
 
 NODE_CLASS_MAPPINGS["ShankUltralyticsDetectorProvider"] = ShankUltralyticsDetectorProvider
 NODE_DISPLAY_NAME_MAPPINGS["ShankUltralyticsDetectorProvider"] = "Ultralytics Detector Provider (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankImageSaverSimple"] = ShankImageSaverSimple
+NODE_DISPLAY_NAME_MAPPINGS["ShankImageSaverSimple"] = "Image Saver Simple (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankImageComparer"] = ShankImageComparer
+NODE_DISPLAY_NAME_MAPPINGS["ShankImageComparer"] = "Image Comparer (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankPowerLoraLoader"] = ShankPowerLoraLoader
+NODE_DISPLAY_NAME_MAPPINGS["ShankPowerLoraLoader"] = "Power Lora Loader (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankBasicInfo"] = ShankBasicInfo
+NODE_DISPLAY_NAME_MAPPINGS["ShankBasicInfo"] = "Basic Info (shanksimi)"
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

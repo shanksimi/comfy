@@ -20,25 +20,43 @@ import math
 
 
 class ShankWildcardEncode:
-    """
-    Shank Wildcard Encode.
-    Thay thế các mẫu {a|b|c} trong prompt bằng một giá trị ngẫu nhiên.
-    """
+    DESCRIPTION = (
+        "Mở rộng wildcard trong prompt, áp dụng LoRA được chỉ định và mã hóa "
+        "prompt thành conditioning. Dùng BREAK để mã hóa từng đoạn riêng "
+        "rồi nối conditioning."
+    )
 
     @classmethod
     def INPUT_TYPES(cls):
         multiline = {"multiline": True, "dynamicPrompts": False}
         return {"required": {
-            "model": ("MODEL",),
-            "clip": ("CLIP",),
-            "wildcard_text": ("STRING", multiline),
-            "populated_text": ("STRING", multiline),
-            "mode": (["populate", "fixed", "reproduce"],),
-            "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+            "model": ("MODEL", {"tooltip": "Model đầu vào để áp dụng LoRA từ prompt."}),
+            "clip": ("CLIP", {"tooltip": "CLIP đầu vào để áp dụng LoRA và mã hóa prompt."}),
+            "wildcard_text": ("STRING", {
+                **multiline,
+                "tooltip": "Prompt mẫu dùng trong Populate. Ví dụ: {đỏ|xanh}, __outfits/dress__ hoặc <lora:tên:0.8>.",
+            }),
+            "populated_text": ("STRING", {
+                **multiline,
+                "tooltip": "Hiển thị prompt đã mở rộng trong Populate. Trong Fixed và Reproduce, bạn có thể chỉnh prompt dùng để chạy tại đây.",
+            }),
+            "mode": (["populate", "fixed", "reproduce"], {
+                "tooltip": "Populate: mở rộng wildcard từ prompt mẫu. Fixed: dùng ô prompt kết quả. Reproduce: dùng ô kết quả một lần, rồi giao diện trở về Populate.",
+            }),
+            "seed": ("INT", {
+                "default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF,
+                "tooltip": "Seed điều khiển việc chọn wildcard. Cùng seed, prompt và danh sách wildcard cho cùng kết quả.",
+            }),
         }}
 
     RETURN_TYPES = ("MODEL", "CLIP", "CONDITIONING", "STRING")
     RETURN_NAMES = ("model", "clip", "conditioning", "populated_text")
+    OUTPUT_TOOLTIPS = (
+        "Model sau khi áp dụng LoRA từ prompt, nếu có.",
+        "CLIP sau khi áp dụng LoRA từ prompt, nếu có.",
+        "Conditioning đã mã hóa để nối vào sampler.",
+        "Prompt đã mở rộng wildcard, gồm cả các thẻ LoRA đã chọn.",
+    )
     FUNCTION = "encode"
     CATEGORY = "text/impact"
 

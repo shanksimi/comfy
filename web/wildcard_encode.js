@@ -8,7 +8,7 @@ app.registerExtension({
     const widget = name => node.widgets?.find(item => item.name === name);
     const mode = widget("mode");
     const populated = widget("populated_text");
-    const addPicker = (label, format) => {
+    const addPicker = (label, format, tooltip) => {
       const choices = [label];
       const picker = node.addWidget("combo", label, label, value => {
         if (value !== label) {
@@ -20,12 +20,12 @@ app.registerExtension({
         }
         picker.value = label;
         node.setDirtyCanvas(true, true);
-      }, { values: choices, serialize: false });
+      }, { values: choices, serialize: false, tooltip });
       picker.serialize = false;
       return choices;
     };
-    const loras = addPicker("Add LoRA", name => "<lora:" + name + ":1.0>");
-    const wildcards = addPicker("Add wildcard", name => "__" + name + "__");
+    const loras = addPicker("Chèn LoRA", name => "<lora:" + name + ":1.0>", "Chèn thẻ LoRA vào ô prompt đang dùng.");
+    const wildcards = addPicker("Chèn wildcard", name => "__" + name + "__", "Chèn tham chiếu wildcard vào ô prompt đang dùng.");
     api.fetchApi("/shanksimi/wildcard-options")
       .then(response => {
         if (!response.ok) throw new Error(response.statusText);

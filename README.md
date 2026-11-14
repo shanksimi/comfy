@@ -80,6 +80,28 @@ Sau khi duyệt, mọi người dùng ComfyUI Manager có thể tìm và cài đ
 - Xem `load_image_metadata.py` để biết cách viết node đọc metadata ảnh.
 - Xem `wildcard_encode.py` để biết cách viết node xử lý wildcard trong prompt.
 
+## Nguồn tham chiếu của các node
+
+Các liên kết upstream trỏ tới commit đã dùng để đối chiếu khi tích hợp.
+
+| Node | Nguồn tham chiếu |
+| --- | --- |
+| [`ShankImageLoad`](nodes/load_image_metadata.py) | Node nội bộ. Đọc metadata A1111/Image Saver và ComfyUI. |
+| [`ShankSeed`](nodes/seed.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/py/seed.py) |
+| [`ShankWildcardEncode`](nodes/wildcard_encode.py) | [Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L2711) |
+| [`ShankAnimaLLLiteApply`](nodes/anima_lllite/__init__.py) | [kohya-ss · b7495bd](https://github.com/kohya-ss/ComfyUI-Anima-LLLite/blob/b7495bd8eb876e334509976896702484ed19cdbb/nodes.py) |
+| [`ShankUNETLoader`](nodes/unet_loader.py) | [Image Saver · 2cccbf0](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_loaders.py) |
+| [`ShankImageSaverSimple`](nodes/image_saver_simple.py) | [Image Saver · 2cccbf0](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes.py#L281) |
+| [`ShankImageComparer`](nodes/image_comparer.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/tree/bc48c6aaeca87bedbc14245d89f9bc6be37a630e) |
+| [`ShankPowerLoraLoader`](nodes/power_lora_loader.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/py/power_lora_loader.py) |
+| [`ShankAIOAuxPreprocessor`](nodes/aio_aux_preprocessor.py) | [ControlNet Aux · a587a4c](https://github.com/Fannovel16/comfyui_controlnet_aux/blob/a587a4c1594524c1d2de5cd1a86cd868ff448e1c/__init__.py#L84) |
+| [`ShankReroutePrimitive`](nodes/reroute_primitive.py) | [Custom Scripts · 609f3af](https://github.com/pythongosssss/ComfyUI-Custom-Scripts/blob/609f3afaa74b2f88ef9ce8d939626065e3247469/web/js/reroutePrimitive.js) |
+| [`ShankUltimateSDUpscale`](nodes/ultimate_sd_upscale.py) | [Ultimate SD Upscale · a5547db](https://github.com/ssitu/ComfyUI_UltimateSDUpscale/blob/a5547db9e1d07d3318bb21e9e9c474f4c1e9c8df/usdu_nodes.py#L109) |
+| [`ShankBatchToImage`](nodes/batch_to_image.py) | [Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/util_nodes.py#L418) |
+| [`ShankFaceDetailer`](nodes/face_detailer.py) | [Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736) |
+| [`ShankHanDetailer`](nodes/face_detailer.py) | [FaceDetailer của Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736), dùng detector bàn tay và prompt mặc định riêng. |
+| [`ShankUltralyticsDetectorProvider`](nodes/ultralytics_detector.py) | [Impact Subpack · 50c7b71](https://github.com/ltdrdata/ComfyUI-Impact-Subpack/blob/50c7b71a6a224734cc9b21963c6d1926816a97f1/modules/subpack_nodes.py) |
+
 ## License
 
 MIT
@@ -139,7 +161,7 @@ YAML hỗ trợ mapping lồng nhau với danh sách ở cuối. Ví dụ
 Chế độ **populate** xử lý `wildcard_text`, **fixed** dùng `populated_text`,
 còn **reproduce** dùng `populated_text` cho lần chạy đó rồi giao diện quay về
 **populate**. Dùng `<lora:tên:0.8:0.6>` để đặt strength riêng cho MODEL và CLIP.
-Dùng `BREAK` để encode từng đoạn và nối conditioning. Hai menu **Add LoRA** và **Add wildcard** chèn vào ô prompt đang dùng.
+Dùng `BREAK` để encode từng đoạn và nối conditioning. Hai menu **Chèn LoRA** và **Chèn wildcard** chèn vào ô prompt đang dùng.
 Khi queue ở chế độ **populate** với prompt tĩnh và seed trực tiếp hoặc từ
 `ShankSeed`, bản workflow gửi đi lưu prompt đã bung ở chế độ **reproduce**.
 Input chỉ có giá trị lúc thực thi được xử lý trong node.
@@ -266,3 +288,37 @@ chi tiết bàn tay. Nối detector nhận diện bàn tay vào `bbox_detector`.
 `ComfyUI/models/ultralytics/segm/`, chọn model phù hợp rồi nối
 `BBOX_DETECTOR` vào `bbox_detector` của FaceDetailer hoặc HandDetailer.
 Tham chiếu [mã upstream tại commit `50c7b71`](https://github.com/ltdrdata/ComfyUI-Impact-Subpack/blob/50c7b71a6a224734cc9b21963c6d1926816a97f1/modules/subpack_nodes.py).
+
+### Image Saver Simple (shanksimi)
+
+`ShankImageSaverSimple` gọi node lưu ảnh từ
+[ComfyUI-Image-Saver của alexopus](https://github.com/alexopus/ComfyUI-Image-Saver).
+Cài extension đó để dùng các định dạng lưu ảnh, metadata Civitai/A1111,
+nhúng workflow và xem trước ảnh đã lưu. Mô tả và tooltip có tiếng Việt.
+
+### Image Comparer (shanksimi)
+
+Nối ảnh trước và sau xử lý vào `image_a` và `image_b`, rồi chạy workflow.
+Kéo thanh trượt để xem hai ảnh trong cùng khung hoặc chọn chế độ bấm để đổi
+ảnh A/B. Với batch, chọn từng ảnh bằng menu A và B. Node dùng PreviewImage
+của ComfyUI. Hành vi tham chiếu
+[Image Comparer của rgthree](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/py/image_comparer.py).
+
+### Power Lora Loader (shanksimi)
+
+Nối MODEL và CLIP nếu có, rồi bấm **Thêm LoRA** để tạo các dòng.
+Mỗi dòng có công tắc bật/tắt và hai ô độ mạnh theo thứ tự MODEL, CLIP.
+Node áp dụng các dòng đang bật theo thứ tự từ trên xuống.
+
+### Basic Info (shanksimi)
+
+`ShankBasicInfo` gom width, height, CFG, steps, hệ số upscale, sampler và
+scheduler vào một node. Cổng `sampler` và `scheduler` nối vào KSampler.
+Hai cổng có hậu tố `_name` trả chuỗi để ghi metadata. Danh sách lựa chọn lấy
+từ KSampler của ComfyUI. Width và height mặc định là 0 như subgraph mẫu.
+Đặt kích thước dương nếu nối vào node tạo latent yêu cầu kích thước cụ thể.
+
+Dropdown `aspect_ratio` có preset ngang, dọc và vuông cho nhóm
+Anima / Illu / Pony và FLUX / Krea / MOSS / Qwen. Các kích thước là gợi ý
+khởi đầu và tỷ lệ có thể được làm tròn. Chọn preset để dùng kích thước ghi
+trong tên preset, hoặc chọn **Custom** để dùng width và height nhập tay.
