@@ -214,3 +214,14 @@ extension nạp được.
 | `UniFormer-SemSegPreprocessor` | UniFormer Segmentor |
 | `Zoe_DepthAnythingPreprocessor` | Zoe Depth Anything |
 | `Zoe-DepthMapPreprocessor` | Zoe Depth Map |
+
+### Reroute Primitive (shanksimi)
+
+`ShankReroutePrimitive` giúp đổi hướng hoặc chia nhánh dây truyền các giá trị
+như số và văn bản trên canvas. Ví dụ, nối cùng một giá trị `steps` tới hai
+KSampler để chỉnh số bước ở một chỗ. Có thể thu gọn node để dây đi qua một
+điểm nhỏ trên canvas.
+
+Bản tích hợp tham chiếu [Reroute Primitive 🐍 của pythongosssss](https://github.com/pythongosssss/ComfyUI-Custom-Scripts/tree/609f3afaa74b2f88ef9ce8d939626065e3247469),
+kèm [giấy phép MIT](LICENSE-reroute-primitive). Upstream đã ẩn node này khỏi
+menu vì ngừng hỗ trợ. Bản này đăng ký node trong mục **utils**.

@@ -4,6 +4,7 @@ from .seed import NODE_CLASS_MAPPINGS as _SEED_NODE_MAPPINGS, NODE_DISPLAY_NAME_
 from .anima_lllite import NODE_CLASS_MAPPINGS as _LLLITE_NODE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as _LLLITE_DISPLAY_MAPPINGS
 from .unet_loader import ShankUNETLoader
 from .aio_aux_preprocessor import ShankAIOAuxPreprocessor
+from .reroute_primitive import ShankReroutePrimitive
 
 NODE_CLASS_MAPPINGS = {**_META_NODE_MAPPINGS, **_WILDCARD_NODE_MAPPINGS, **_SEED_NODE_MAPPINGS, **_LLLITE_NODE_MAPPINGS}
 NODE_DISPLAY_NAME_MAPPINGS = {**_META_DISPLAY_MAPPINGS, **_WILDCARD_DISPLAY_MAPPINGS, **_SEED_DISPLAY_MAPPINGS, **_LLLITE_DISPLAY_MAPPINGS}
@@ -13,5 +14,8 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankUNETLoader"] = "U-Net Loader with Filename (sha
 
 NODE_CLASS_MAPPINGS["ShankAIOAuxPreprocessor"] = ShankAIOAuxPreprocessor
 NODE_DISPLAY_NAME_MAPPINGS["ShankAIOAuxPreprocessor"] = "AIO Aux Preprocessor (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankReroutePrimitive"] = ShankReroutePrimitive
+NODE_DISPLAY_NAME_MAPPINGS["ShankReroutePrimitive"] = "Reroute Primitive (shanksimi)"
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
