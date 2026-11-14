@@ -225,3 +225,44 @@ KSampler để chỉnh số bước ở một chỗ. Có thể thu gọn node đ
 Bản tích hợp tham chiếu [Reroute Primitive 🐍 của pythongosssss](https://github.com/pythongosssss/ComfyUI-Custom-Scripts/tree/609f3afaa74b2f88ef9ce8d939626065e3247469),
 kèm [giấy phép MIT](LICENSE-reroute-primitive). Upstream đã ẩn node này khỏi
 menu vì ngừng hỗ trợ. Bản này đăng ký node trong mục **utils**.
+
+### Ultimate SD Upscale (shanksimi)
+
+`ShankUltimateSDUpscale` phóng lớn ảnh rồi vẽ lại từng ô bằng diffusion.
+Dùng `upscale_by` để chọn hệ số phóng, `denoise` để chỉnh mức vẽ lại và
+`seam_fix_mode` để xử lý đường nối. Mô tả node và tooltip được dịch sang tiếng Việt.
+
+Cài [ComfyUI_UltimateSDUpscale](https://github.com/ssitu/ComfyUI_UltimateSDUpscale)
+để cung cấp bộ xử lý. Bản tích hợp gọi trực tiếp node gốc và dùng các tùy chọn
+của phiên bản đã cài. Tooltip tham chiếu
+[commit `a5547db`](https://github.com/ssitu/ComfyUI_UltimateSDUpscale/blob/a5547db9e1d07d3318bb21e9e9c474f4c1e9c8df/usdu_nodes.py).
+
+### Batch to Image (shanksimi)
+
+`ShankBatchToImage` tách batch thành danh sách ảnh riêng lẻ, giữ nguyên thứ tự.
+Ví dụ, batch 4 ảnh sẽ cho 4 phần tử để node kế tiếp xử lý từng ảnh.
+Cách hoạt động tham chiếu [Image Batch to Image List của Impact Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/util_nodes.py#L418).
+
+### FaceDetailer (shanksimi)
+
+`ShankFaceDetailer` dùng detector để tìm khuôn mặt hoặc đối tượng, cải thiện
+chi tiết trong từng vùng phát hiện rồi ghép lại vào ảnh. Cần cài
+[ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) và nối
+detector vào `bbox_detector`. Node dùng đầu vào và bộ xử lý của Impact Pack
+đã cài, với mô tả và tooltip đầu ra bằng tiếng Việt. Tham chiếu
+[FaceDetailer tại commit `7ff671a`](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736).
+
+### HandDetailer (shanksimi)
+
+`ShankHanDetailer` dùng pipeline FaceDetailer của Impact Pack để cải thiện
+chi tiết bàn tay. Nối detector nhận diện bàn tay vào `bbox_detector`. Các
+đầu vào, thông số và đầu ra dùng cùng cấu trúc với FaceDetailer.
+
+### Ultralytics Detector Provider (shanksimi)
+
+`ShankUltralyticsDetectorProvider` gọi node gốc từ
+[ComfyUI-Impact-Subpack](https://github.com/ltdrdata/ComfyUI-Impact-Subpack).
+Đặt weights trong `ComfyUI/models/ultralytics/bbox/` hoặc
+`ComfyUI/models/ultralytics/segm/`, chọn model phù hợp rồi nối
+`BBOX_DETECTOR` vào `bbox_detector` của FaceDetailer hoặc HandDetailer.
+Tham chiếu [mã upstream tại commit `50c7b71`](https://github.com/ltdrdata/ComfyUI-Impact-Subpack/blob/50c7b71a6a224734cc9b21963c6d1926816a97f1/modules/subpack_nodes.py).
