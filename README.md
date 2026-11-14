@@ -122,3 +122,27 @@ tên hiển thị. Khi upstream cập nhật, đối chiếu `nodes.py` và
 **Apply Anima ControlNet-LLLite (shanksimi)**, nối model Anima và ảnh điều kiện,
 chọn weights, rồi nối output `MODEL` tới sampler. Với weights inpaint, nối
 thêm mask theo hướng dẫn upstream.
+
+### Nguồn tham chiếu cho ShankWildcardEncode
+
+Cú pháp wildcard tham chiếu [ComfyUI-Impact-Pack, commit `7ff671a`](https://github.com/ltdrdata/ComfyUI-Impact-Pack/tree/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6).
+Khi đối chiếu upstream, xem `modules/impact/wildcards.py` và class
+`ImpactWildcardEncode` trong `modules/impact/impact_pack.py`.
+
+Đặt danh sách UTF-8 trong `wildcards/` ở gốc repo, mỗi lựa chọn một dòng.
+Ví dụ `__outfits/dress__` đọc `wildcards/outfits/dress.txt`. Node hỗ trợ
+`__outfits/*__`, `{2::red|1::blue}`, `{2$$, $$red|blue|gold}` và nhóm lồng
+nhau. Dòng bắt đầu bằng `#` được bỏ qua. Node trả `MODEL`, `CLIP`, `CONDITIONING` và prompt đã xử lý.
+
+YAML hỗ trợ mapping lồng nhau với danh sách ở cuối. Ví dụ
+`outfits: {dress: [red, blue]}` tạo wildcard `__outfits/dress__`.
+Chế độ **populate** xử lý `wildcard_text`, **fixed** dùng `populated_text`,
+còn **reproduce** dùng `populated_text` cho lần chạy đó rồi giao diện quay về
+**populate**. Dùng `<lora:tên:0.8:0.6>` để đặt strength riêng cho MODEL và CLIP.
+Dùng `BREAK` để encode từng đoạn và nối conditioning. Hai menu **Add LoRA** và **Add wildcard** chèn vào ô prompt đang dùng.
+Khi queue ở chế độ **populate** với prompt tĩnh và seed trực tiếp hoặc từ
+`ShankSeed`, bản workflow gửi đi lưu prompt đã bung ở chế độ **reproduce**.
+Input chỉ có giá trị lúc thực thi được xử lý trong node.
+
+Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với ComfyUI-Inspire-Pack hoặc
+`<lora:tên:0.8:LOADER=nunchaku>` với ComfyUI-nunchaku.

@@ -419,18 +419,6 @@ let lastTab = "input_folder";
 app.registerExtension({
   name: "ShankImageLoad.Browser",
   nodeCreated(node) {
-    if (node.comfyClass === "ShankWildcardEncode") {
-      const onExecuted = node.onExecuted;
-      node.onExecuted = function (message) {
-        onExecuted?.apply(this, arguments);
-        const widget = this.widgets?.find((item) => item.name === "display_text");
-        if (widget && typeof message?.text?.[0] === "string") {
-          widget.value = message.text[0];
-          this.setDirtyCanvas(true, true);
-        }
-      };
-      return;
-    }
     if (node.comfyClass !== "ShankImageLoad") return;
     const get = (n) => (node.widgets || []).find((x) => x.name === n);
     const folderValue = () => { const w = get("drive_folder"); return w ? String(w.value || "") : ""; };

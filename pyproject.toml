@@ -5,7 +5,7 @@ version = "1.0.0"
 license = { text = "MIT" }
 authors = [{ name = "shanksimi" }]
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["PyYAML"]
 
 [project.urls]
 Repository = "https://github.com/shanksimi/comfy"
