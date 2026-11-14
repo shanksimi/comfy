@@ -44,6 +44,8 @@ app.registerExtension({
     if (node.comfyClass !== nodeType) return;
     const seed = node.widgets?.find(widget => widget.name === "seed");
     if (!seed) return;
+    const controlIndex = node.widgets.findIndex(widget => widget.name === "control_after_generate");
+    if (controlIndex !== -1) node.widgets.splice(controlIndex, 1);
     const state = { node, lastSeed: undefined };
     const button = (label, callback) => {
       const widget = node.addWidget("button", label, null, callback, { serialize: false });

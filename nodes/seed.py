@@ -15,7 +15,7 @@ class ShankSeed:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "seed": ("INT", {"default": -1, "min": -cls.LIMIT, "max": cls.LIMIT}),
+                "seed": ("INT", {"default": -1, "min": -cls.LIMIT, "max": cls.LIMIT, "control_after_generate": False}),
             },
             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO", "unique_id": "UNIQUE_ID"},
         }

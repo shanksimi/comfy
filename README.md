@@ -146,3 +146,9 @@ Input chỉ có giá trị lúc thực thi được xử lý trong node.
 
 Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với ComfyUI-Inspire-Pack hoặc
 `<lora:tên:0.8:LOADER=nunchaku>` với ComfyUI-nunchaku.
+
+### U-Net Loader with Filename (shanksimi)
+
+`ShankUNETLoader` dùng loader diffusion model gốc của ComfyUI, giữ tùy chọn
+`weight_dtype` và trả thêm `filename` dạng STRING để nối vào node lưu ảnh.
+Hành vi tham chiếu [UNETLoaderWithName của Image Saver](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_loaders.py).
