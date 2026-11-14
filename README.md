@@ -88,10 +88,12 @@ Các liên kết upstream trỏ tới commit đã dùng để đối chiếu khi
 | --- | --- |
 | [`ShankImageLoad`](nodes/load_image_metadata.py) | Node nội bộ. Đọc metadata A1111/Image Saver và ComfyUI. |
 | [`ShankSeed`](nodes/seed.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/py/seed.py) |
+| [`ShankSimpleMath`](nodes/simple_math.py) | [ComfyUI Essentials · 9d9f4be](https://github.com/cubiq/ComfyUI_essentials/blob/9d9f4bedfc9f0321c19faf71855e228c93bd0dc9/misc.py#L122) |
 | [`ShankWildcardEncode`](nodes/wildcard_encode.py) | [Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L2711) |
 | [`ShankAnimaLLLiteApply`](nodes/anima_lllite/__init__.py) | [kohya-ss · b7495bd](https://github.com/kohya-ss/ComfyUI-Anima-LLLite/blob/b7495bd8eb876e334509976896702484ed19cdbb/nodes.py) |
 | [`ShankUNETLoader`](nodes/unet_loader.py) | [Image Saver · 2cccbf0](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_loaders.py) |
 | [`ShankImageSaverSimple`](nodes/image_saver_simple.py) | [Image Saver · 2cccbf0](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes.py#L281) |
+| [`ShankMetadata`](nodes/image_saver_simple.py) | [Image Saver · 2cccbf0](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes.py#L149) |
 | [`ShankImageComparer`](nodes/image_comparer.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/tree/bc48c6aaeca87bedbc14245d89f9bc6be37a630e) |
 | [`ShankPowerLoraLoader`](nodes/power_lora_loader.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/py/power_lora_loader.py) |
 | [`ShankAIOAuxPreprocessor`](nodes/aio_aux_preprocessor.py) | [ControlNet Aux · a587a4c](https://github.com/Fannovel16/comfyui_controlnet_aux/blob/a587a4c1594524c1d2de5cd1a86cd868ff448e1c/__init__.py#L84) |
@@ -322,3 +324,15 @@ Dropdown `aspect_ratio` có preset ngang, dọc và vuông cho nhóm
 Anima / Illu / Pony và FLUX / Krea / MOSS / Qwen. Các kích thước là gợi ý
 khởi đầu và tỷ lệ có thể được làm tròn. Chọn preset để dùng kích thước ghi
 trong tên preset, hoặc chọn **Custom** để dùng width và height nhập tay.
+
+### Metadata
+
+Nối thông số từ Basic Info, seed, tên model và prompt vào
+`ShankMetadata`. Nối output `metadata` vào cổng cùng tên của
+Image Saver Simple. Node dùng bộ tạo metadata của ComfyUI-Image-Saver.
+
+### Fast Groups Bypasser (shanksimi)
+
+`ShankFastGroupsBypasser` chạy trên giao diện. Mỗi công tắc bật hoặc bypass
+các node trong một nhóm của graph hiện tại. Bản tích hợp tham chiếu
+[Fast Groups Bypasser của rgthree](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/web/comfyui/fast_groups_bypasser.js).

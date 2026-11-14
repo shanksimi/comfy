@@ -9,10 +9,11 @@ from .ultimate_sd_upscale import ShankUltimateSDUpscale
 from .batch_to_image import ShankBatchToImage
 from .face_detailer import ShankFaceDetailer, ShankHanDetailer
 from .ultralytics_detector import ShankUltralyticsDetectorProvider
-from .image_saver_simple import ShankImageSaverSimple
+from .image_saver_simple import ShankMetadata, ShankImageSaverSimple
 from .image_comparer import ShankImageComparer
 from .power_lora_loader import ShankPowerLoraLoader
 from .basic_info import ShankBasicInfo
+from .simple_math import ShankSimpleMath
 
 NODE_CLASS_MAPPINGS = {**_META_NODE_MAPPINGS, **_WILDCARD_NODE_MAPPINGS, **_SEED_NODE_MAPPINGS, **_LLLITE_NODE_MAPPINGS}
 NODE_DISPLAY_NAME_MAPPINGS = {**_META_DISPLAY_MAPPINGS, **_WILDCARD_DISPLAY_MAPPINGS, **_SEED_DISPLAY_MAPPINGS, **_LLLITE_DISPLAY_MAPPINGS}
@@ -52,5 +53,11 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankPowerLoraLoader"] = "Power Lora Loader (shanksi
 
 NODE_CLASS_MAPPINGS["ShankBasicInfo"] = ShankBasicInfo
 NODE_DISPLAY_NAME_MAPPINGS["ShankBasicInfo"] = "Basic Info (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankSimpleMath"] = ShankSimpleMath
+NODE_DISPLAY_NAME_MAPPINGS["ShankSimpleMath"] = "Simple Math (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankMetadata"] = ShankMetadata
+NODE_DISPLAY_NAME_MAPPINGS["ShankMetadata"] = "Metadata"
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

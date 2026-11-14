@@ -62,3 +62,62 @@ class ShankImageSaverSimple:
         if upstream is None:
             raise RuntimeError("Cần cài ComfyUI-Image-Saver của alexopus để lưu ảnh.")
         return getattr(upstream(), upstream.FUNCTION)(**inputs)
+
+
+_METADATA_TOOLTIPS = {
+    "modelname": "Tên file model. Có thể nhập nhiều tên, phân cách bằng dấu phẩy.",
+    "positive": "Prompt mô tả nội dung mong muốn.",
+    "negative": "Prompt mô tả nội dung cần tránh.",
+    "width": "Chiều rộng ảnh tính bằng pixel.",
+    "height": "Chiều cao ảnh tính bằng pixel.",
+    "seed_value": "Seed dùng để tạo ảnh.",
+    "steps": "Số bước lấy mẫu.",
+    "cfg": "Mức độ bám conditioning khi lấy mẫu.",
+    "sampler_name": "Tên sampler dạng chuỗi.",
+    "scheduler_name": "Tên scheduler dạng chuỗi.",
+    "denoise": "Mức khử nhiễu dùng khi tạo ảnh.",
+    "clip_skip": "Số lớp CLIP cuối được bỏ qua. Giá trị 0 giữ nguyên.",
+    "additional_hashes": "Hash bổ sung, phân cách bằng dấu phẩy. Ví dụ: MyLoRA:FF735FF83F98.",
+    "download_civitai_data": "Tải và lưu đệm thông tin Civitai để bổ sung metadata, gồm strength LoRA khi có.",
+    "easy_remix": "Bỏ thẻ LoRA và rút gọn đường dẫn embedding để dùng Remix trên Civitai.",
+    "custom": "Chuỗi tùy chỉnh chèn vào metadata A1111 giữa CLIP skip và hash model.",
+}
+
+
+class ShankMetadata:
+    CATEGORY = "image"
+    FUNCTION = "get_metadata"
+    RETURN_TYPES = ("METADATA", "STRING", "STRING")
+    RETURN_NAMES = ("metadata", "hashes", "a1111_params")
+    OUTPUT_TOOLTIPS = (
+        "Gói metadata để nối vào Image Saver Simple.",
+        "Danh sách hash để nối vào additional_hashes của node khác.",
+        "Chuỗi tham số tạo ảnh theo định dạng A1111.",
+    )
+    DESCRIPTION = "Gom thông số tạo ảnh để Image Saver Simple nhúng metadata khi lưu."
+
+    @staticmethod
+    def upstream():
+        from nodes import NODE_CLASS_MAPPINGS
+
+        return NODE_CLASS_MAPPINGS.get("Image Saver Metadata")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        upstream = cls.upstream()
+        if upstream is None:
+            return {"required": {}}
+        return {
+            group: {
+                name: (spec[0], {**spec[1], "tooltip": _METADATA_TOOLTIPS[name]})
+                if name in _METADATA_TOOLTIPS else spec
+                for name, spec in inputs.items()
+            }
+            for group, inputs in upstream.INPUT_TYPES().items()
+        }
+
+    def get_metadata(self, **inputs):
+        upstream = self.upstream()
+        if upstream is None:
+            raise RuntimeError("Cần cài ComfyUI-Image-Saver của alexopus để tạo metadata.")
+        return getattr(upstream(), upstream.FUNCTION)(**inputs)
