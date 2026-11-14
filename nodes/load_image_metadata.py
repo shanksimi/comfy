@@ -582,20 +582,25 @@ app.registerExtension({
         uploadBtn.style.display = tab === "input_folder" ? "" : "none";
       }
 
+      let loadVersion = 0;
       async function load(path) {
+        const version = ++loadVersion;
+        const source = tab;
+        const driveFolder = folderValue();
         styleTabs();
         marks = [];
         body.replaceChildren(el("div", { padding: "10px" }, "Loading..."));
-        const params = new URLSearchParams({ source: tab, drive_folder: folderValue() });
+        const params = new URLSearchParams({ source, drive_folder: driveFolder });
         if (path !== null && path !== undefined) params.set("path", path);
         let d;
         try {
           const r = await api.fetchApi("/load_image_metadata/browse?" + params.toString());
           d = await r.json();
         } catch (e) {
-          body.replaceChildren(el("div", { padding: "10px" }, "Loi ket noi: " + e));
+          if (version === loadVersion) body.replaceChildren(el("div", { padding: "10px" }, "Loi ket noi: " + e));
           return;
         }
+        if (version !== loadVersion) return;
         if (d.error) {
           data = null;
           pathLbl.textContent = "";
@@ -644,7 +649,37 @@ app.registerExtension({
           }, "\u270E");
           editBtn.title = "View full size / draw mask";
           editBtn.onclick = (ev) => { ev.stopPropagation(); openMaskEditor(f); };
-          t.append(editBtn);
+          const deleteBtn = el("button", {
+            position: "absolute", top: "8px", left: "36px", width: "22px", height: "22px",
+            padding: "0", borderRadius: "4px", border: "0", background: "#8a2929", color: "#fff",
+            cursor: "pointer",
+          }, "×");
+          deleteBtn.type = "button";
+          deleteBtn.title = "Delete image";
+          deleteBtn.setAttribute("aria-label", "Delete " + f.name);
+          deleteBtn.onclick = async (ev) => {
+            ev.stopPropagation();
+            if (!window.confirm("Permanently delete " + f.name + "?")) return;
+            deleteBtn.disabled = true;
+            try {
+              const response = await api.fetchApi("/load_image_metadata/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ source, drive_folder: driveFolder, path: join(d.path, f.name) }),
+              });
+              const result = await response.json();
+              if (!response.ok) throw new Error(result.error || response.statusText);
+              selected.delete(f.value);
+              const entries = getEntries();
+              if (entries.includes(f.value)) setEntries(entries.filter((entry) => entry !== f.value));
+              refreshMarks();
+              if (overlay.isConnected && version === loadVersion) await load(d.path);
+            } catch (error) {
+              if (overlay.isConnected) window.alert("Could not delete image: " + error.message);
+              deleteBtn.disabled = false;
+            }
+          };
+          t.append(editBtn, deleteBtn);
           const mark = () => {
             const on = selected.has(f.value);
             badge.style.display = on ? "flex" : "none";
@@ -1157,6 +1192,29 @@ def _register_routes():
                                     headers={"Cache-Control": "no-cache"})
             except Exception:
                 return web.Response(status=404)
+
+        @routes.post("/load_image_metadata/delete")
+        async def _delete(request):
+            if request.content_type != "application/json":
+                return web.json_response({"error": "Expected JSON"}, status=415)
+            try:
+                body = await request.json()
+                if not isinstance(body, dict) or not isinstance(body.get("path"), str):
+                    raise ValueError("Invalid image path")
+                root = _browse_root(body.get("source"), body.get("drive_folder", ""))
+                path, _ = _join_inside(root, body["path"])
+                if not _is_image_name(path) or os.path.islink(path):
+                    raise ValueError("Expected a regular image file")
+                if not os.path.isfile(path):
+                    raise FileNotFoundError
+                os.unlink(path)
+            except ValueError as e:
+                return web.json_response({"error": str(e)}, status=400)
+            except FileNotFoundError:
+                return web.json_response({"error": "Image not found"}, status=404)
+            except OSError as e:
+                return web.json_response({"error": e.strerror or str(e)}, status=409)
+            return web.json_response({"deleted": True})
 
         @routes.post("/load_image_metadata/save_mask")
         async def _save_mask(request):
