@@ -25,5 +25,20 @@
     "website": "",
     "license": "MIT",
     "tags": ["seed", "utils", "vietnamese"]
+  },
+  "ShankAnimaLLLiteApply": {
+    "display_name": "Apply Anima ControlNet-LLLite (shanksimi)",
+    "description": "Áp dụng ControlNet-LLLite lên model Anima bằng ảnh điều kiện và mask tùy chọn.",
+    "authors": [
+      "kohya-ss",
+      "shanksimi"
+    ],
+    "website": "https://github.com/kohya-ss/ComfyUI-Anima-LLLite",
+    "license": "Apache-2.0",
+    "tags": [
+      "anima",
+      "controlnet",
+      "lllite"
+    ]
   }
 }

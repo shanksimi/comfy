@@ -92,3 +92,33 @@ Nếu lưu ảnh ở nơi khác, đặt biến môi trường `SHANK_COMFY_DRIVE
 đường dẫn tuyệt đối của thư mục ảnh trước khi khởi động ComfyUI. Sau đó cập
 nhật ô `drive_folder` trong workflow đã lưu để trỏ vào thư mục đó hoặc một
 thư mục con. Ô này hỗ trợ mẫu ngày như `%Y-%m-%d`.
+
+### Nguồn tham chiếu cho ShankSeed
+
+`ShankSeed` mô phỏng giao diện và hành vi của node **Seed (rgthree)** trong
+[rgthree-comfy](https://github.com/rgthree/rgthree-comfy). Bản tham chiếu ban đầu
+là commit [`bc48c6a`](https://github.com/rgthree/rgthree-comfy/commit/bc48c6aaeca87bedbc14245d89f9bc6be37a630e).
+
+| Phần | Mã trong repo này | Mã upstream tại commit tham chiếu |
+| --- | --- | --- |
+| Xử lý seed phía server | [nodes/seed.py](nodes/seed.py) | [py/seed.py](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/py/seed.py) |
+| Giao diện và xử lý khi queue | [web/seed.js](web/seed.js) | [src_web/comfyui/seed.ts](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/src_web/comfyui/seed.ts) |
+
+Khi kiểm tra bản mới của rgthree, đối chiếu thay đổi của hai file upstream
+kể từ commit tham chiếu. Sau khi áp dụng thay đổi, kiểm tra seed cố định,
+random mỗi lần queue, tăng/giảm seed, nút **Use Last Seed** và seed thực tế
+trong metadata ảnh. Cập nhật commit tham chiếu khi đã kiểm tra xong.
+
+### Apply Anima ControlNet-LLLite (shanksimi)
+
+Node `ShankAnimaLLLiteApply` tích hợp
+[ComfyUI-Anima-LLLite của kohya-ss](https://github.com/kohya-ss/ComfyUI-Anima-LLLite)
+tại [commit `b7495bd`](https://github.com/kohya-ss/ComfyUI-Anima-LLLite/commit/b7495bd8eb876e334509976896702484ed19cdbb).
+Phần này dùng [Apache-2.0](nodes/anima_lllite/LICENSE). Bản tích hợp đổi ID và
+tên hiển thị. Khi upstream cập nhật, đối chiếu `nodes.py` và
+`control_net_lllite_anima.py` với các file trong `nodes/anima_lllite/`.
+
+Đặt weights LLLite `.safetensors` vào `ComfyUI/models/controlnet/`. Thêm node
+**Apply Anima ControlNet-LLLite (shanksimi)**, nối model Anima và ảnh điều kiện,
+chọn weights, rồi nối output `MODEL` tới sampler. Với weights inpaint, nối
+thêm mask theo hướng dẫn upstream.
