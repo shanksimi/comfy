@@ -152,3 +152,65 @@ Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với ComfyUI-Inspire-Pack hoặc
 `ShankUNETLoader` dùng loader diffusion model gốc của ComfyUI, giữ tùy chọn
 `weight_dtype` và trả thêm `filename` dạng STRING để nối vào node lưu ảnh.
 Hành vi tham chiếu [UNETLoaderWithName của Image Saver](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_loaders.py).
+
+### AIO Aux Preprocessor (shanksimi)
+
+`ShankAIOAuxPreprocessor` gọi node `AIO_Preprocessor` của
+[comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux/blob/a587a4c1594524c1d2de5cd1a86cd868ff448e1c/__init__.py).
+Cài extension đó và khởi động lại ComfyUI để dùng danh sách preprocessor và
+model của nó. Khi extension chưa có, node chỉ hiện lựa chọn `none` để trả
+ảnh đầu vào.
+
+Danh sách lựa chọn AIO tại commit upstream ở trên. Menu trong ComfyUI lấy
+danh sách trực tiếp từ extension đã cài và chỉ hiện các preprocessor mà
+extension nạp được.
+
+| ID | Tên hiển thị |
+| --- | --- |
+| `none` | Trả ảnh đầu vào |
+| `AnimalPosePreprocessor` | AnimalPose Estimator (AP10K) |
+| `AnimeFace_SemSegPreprocessor` | Anime Face Segmentor |
+| `AnimeLineArtPreprocessor` | Anime Lineart |
+| `AnyLineArtPreprocessor_aux` | AnyLine Lineart |
+| `BAE-NormalMapPreprocessor` | BAE Normal Map |
+| `BinaryPreprocessor` | Binary Lines |
+| `CannyEdgePreprocessor` | Canny Edge |
+| `ColorPreprocessor` | Color Pallete |
+| `ShufflePreprocessor` | Content Shuffle |
+| `DensePosePreprocessor` | DensePose Estimator |
+| `DepthAnythingPreprocessor` | Depth Anything |
+| `DepthAnythingV2Preprocessor` | Depth Anything V2 - Relative |
+| `DSINE-NormalMapPreprocessor` | DSINE Normal Map |
+| `DWPreprocessor` | DWPose Estimator |
+| `FakeScribblePreprocessor` | Fake Scribble Lines (aka scribble_hed) |
+| `HEDPreprocessor` | HED Soft-Edge Lines |
+| `ImageIntensityDetector` | Image Intensity |
+| `ImageLuminanceDetector` | Image Luminance |
+| `LeReS-DepthMapPreprocessor` | LeReS Depth Map (enable boost for leres++) |
+| `M-LSDPreprocessor` | M-LSD Lines |
+| `Manga2Anime_LineArt_Preprocessor` | Manga Lineart (aka lineart_anime_denoise) |
+| `MediaPipe-FaceMeshPreprocessor` | MediaPipe Face Mesh |
+| `MeshGraphormer-DepthMapPreprocessor` | MeshGraphormer Hand Refiner |
+| `Metric3D-DepthMapPreprocessor` | Metric3D Depth Map |
+| `Metric3D-NormalMapPreprocessor` | Metric3D Normal Map |
+| `MiDaS-DepthMapPreprocessor` | MiDaS Depth Map |
+| `MiDaS-NormalMapPreprocessor` | MiDaS Normal Map |
+| `OneFormer-ADE20K-SemSegPreprocessor` | OneFormer ADE20K Segmentor |
+| `OneFormer-COCO-SemSegPreprocessor` | OneFormer COCO Segmentor |
+| `OpenposePreprocessor` | OpenPose Pose |
+| `PiDiNetPreprocessor` | PiDiNet Soft-Edge Lines |
+| `PyraCannyPreprocessor` | PyraCanny |
+| `LineArtPreprocessor` | Realistic Lineart |
+| `SAMPreprocessor` | SAM Segmentor |
+| `ScribblePreprocessor` | Scribble Lines |
+| `Scribble_PiDiNet_Preprocessor` | Scribble PiDiNet Lines |
+| `Scribble_XDoG_Preprocessor` | Scribble XDoG Lines |
+| `SemSegPreprocessor` | Semantic Segmentor (legacy, alias for UniFormer) |
+| `LineartStandardPreprocessor` | Standard Lineart |
+| `TEEDPreprocessor` | TEEDPreprocessor |
+| `TilePreprocessor` | Tile |
+| `TTPlanet_TileGF_Preprocessor` | TTPlanet Tile GuidedFilter |
+| `TTPlanet_TileSimple_Preprocessor` | TTPlanet Tile Simple |
+| `UniFormer-SemSegPreprocessor` | UniFormer Segmentor |
+| `Zoe_DepthAnythingPreprocessor` | Zoe Depth Anything |
+| `Zoe-DepthMapPreprocessor` | Zoe Depth Map |
