@@ -8,6 +8,9 @@ Hỗ trợ: seed cố định, random seed, tăng/giảm seed, và nút copy/pas
 import random
 
 
+MAX_SEED = 0xFFFFFFFFFFFFFFFF
+
+
 class ShankSeed:
     """
     Seed Node.
@@ -18,11 +21,11 @@ class ShankSeed:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": MAX_SEED}),
                 "mode": (["fixed", "random", "increment", "decrement"], {"default": "fixed"}),
             },
             "optional": {
-                "prev_seed": ("INT", {"default": 0, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "prev_seed": ("INT", {"default": 0, "min": 0, "max": MAX_SEED}),
             },
         }
 
@@ -32,22 +35,25 @@ class ShankSeed:
     CATEGORY = "utils/seed"
     OUTPUT_NODE = False
 
-    def get_seed(self, seed=0, mode="fixed", prev_seed=0):
+    @classmethod
+    def IS_CHANGED(cls, mode, **kwargs):
+        return float("nan") if mode == "random" else mode
+
+    def get_seed(self, seed=0, mode="fixed", prev_seed=None):
         """
         Trả về seed hiện tại và seed kế tiếp (dùng để nối chuỗi node Seed).
         """
+        base_seed = seed if not prev_seed else prev_seed
         if mode == "random":
-            current_seed = random.randint(0, 0xFFFFFFFFFFFFFFFF)
+            current_seed = random.randint(0, MAX_SEED)
         elif mode == "increment":
-            current_seed = prev_seed + 1 if prev_seed > 0 else seed + 1
+            current_seed = (base_seed + 1) & MAX_SEED
         elif mode == "decrement":
-            current_seed = prev_seed - 1 if prev_seed > 0 else seed - 1
-            if current_seed < 0:
-                current_seed = 0
+            current_seed = max(0, base_seed - 1)
         else:  # fixed
             current_seed = seed
 
-        next_seed = current_seed + 1
+        next_seed = (current_seed + 1) & MAX_SEED
 
         return (current_seed, next_seed)
 

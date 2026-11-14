@@ -32,10 +32,12 @@ import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import numpy as np
 import torch
 from PIL import Image, ImageChops, ImageOps
+from PIL.PngImagePlugin import PngInfo
 
 import folder_paths
 import node_helpers
@@ -53,9 +55,12 @@ _RE_PARAM = re.compile(r'\s*([\w ]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)')
 
 def _to_int(v, default=0):
     try:
-        return int(float(str(v).strip()))
-    except Exception:
-        return default
+        return int(str(v).strip())
+    except (ValueError, TypeError):
+        try:
+            return int(Decimal(str(v).strip()))
+        except (ArithmeticError, ValueError, TypeError):
+            return default
 
 
 def _to_float(v, default=0.0):
@@ -280,8 +285,8 @@ def _resolve_entry(entry):
     """Duong dan tuyet doi -> giu nguyen; duong dan tuong doi -> tinh tu ComfyUI/input."""
     e = entry.strip().strip('"')
     if os.path.isabs(e):
-        return os.path.normpath(e)
-    return os.path.normpath(os.path.join(folder_paths.get_input_directory(), e))
+        return _thumb_path_for_entry(e, "")
+    return _join_inside(folder_paths.get_input_directory(), e)[0]
 
 
 def _parse_selection(images):
@@ -352,7 +357,7 @@ class LoadImageWithMetadata:
             },
             "optional": {
                 # Thu muc Drive mo dau trong cua so duyet file (ho tro %Y-%m-%d ...)
-                "drive_folder": ("STRING", {"default": DRIVE_FOLDER_DEFAULT, "multiline": False}),
+                "drive_folder": ("STRING", {"default": os.environ.get("SHANK_COMFY_DRIVE_ROOT") or DRIVE_FOLDER_DEFAULT, "multiline": False}),
             },
         }
 
@@ -414,6 +419,18 @@ let lastTab = "input_folder";
 app.registerExtension({
   name: "LoadImageWithMetadata.Browser",
   nodeCreated(node) {
+    if (node.comfyClass === "ShankWildcardEncode") {
+      const onExecuted = node.onExecuted;
+      node.onExecuted = function (message) {
+        onExecuted?.apply(this, arguments);
+        const widget = this.widgets?.find((item) => item.name === "display_text");
+        if (widget && typeof message?.text?.[0] === "string") {
+          widget.value = message.text[0];
+          this.setDirtyCanvas(true, true);
+        }
+      };
+      return;
+    }
     if (node.comfyClass !== "LoadImageWithMetadata") return;
     const get = (n) => (node.widgets || []).find((x) => x.name === n);
     const folderValue = () => { const w = get("drive_folder"); return w ? String(w.value || "") : ""; };
@@ -946,11 +963,12 @@ def _inside(base, p):
 def _browse_root(source, template):
     if source == "input_folder":
         return folder_paths.get_input_directory()
-    base = _template_root(DRIVE_FOLDER_DEFAULT)
-    today = _resolve_drive_folder(template, DRIVE_UTC_OFFSET_DEFAULT)
-    if _inside(base, today):
-        return base
-    return _template_root(template)
+    if source != "drive_folder":
+        raise ValueError("Nguon anh khong hop le")
+    base = os.path.realpath(os.environ.get("SHANK_COMFY_DRIVE_ROOT") or _template_root(DRIVE_FOLDER_DEFAULT))
+    if template and not _inside(base, _resolve_drive_folder(template, DRIVE_UTC_OFFSET_DEFAULT)):
+        raise ValueError("Thu muc Drive nam ngoai thu muc cho phep")
+    return base
 
 
 def _join_inside(root, rel):
@@ -965,8 +983,10 @@ def _thumb_path_for_entry(entry, template):
     """Entry tuong doi -> trong ComfyUI/input; tuyet doi -> phai nam trong thu muc Drive cho phep."""
     e = str(entry or "").strip().strip('"')
     if os.path.isabs(e):
-        root = _browse_root("drive_folder", template)
         p = os.path.normpath(e)
+        if _inside(folder_paths.get_input_directory(), p):
+            return p
+        root = _browse_root("drive_folder", template)
         if not _inside(root, p):
             raise ValueError("Duong dan nam ngoai thu muc cho phep")
         return p
@@ -1013,8 +1033,16 @@ def _save_mask_png(src_path, mask_bytes):
     """Ghep mask (trang = vung mask) vao kenh alpha cua anh goc: vung mask -> trong suot.
     Luu vao ComfyUI/input/masks/, tra ve duong dan tuong doi de dung lam entry."""
     import io
-    img = Image.open(src_path)
-    img = ImageOps.exif_transpose(img)
+    with Image.open(src_path) as original:
+        pnginfo = PngInfo()
+        for key, value in original.info.items():
+            if isinstance(value, str):
+                pnginfo.add_itxt(key, value)
+        if not original.info.get("parameters"):
+            comment = _exif_user_comment(original)
+            if comment:
+                pnginfo.add_itxt("parameters", comment)
+        img = ImageOps.exif_transpose(original)
     if img.mode == "I":
         img = img.point(lambda i: i * (1 / 255))
     rgba = img.convert("RGBA")
@@ -1024,13 +1052,26 @@ def _save_mask_png(src_path, mask_bytes):
     # alpha moi = alpha cu * (1 - mask); PIL giu nguyen mau RGB duoi vung trong suot
     rgba.putalpha(ImageChops.multiply(rgba.getchannel("A"), ImageOps.invert(m)))
     out_dir = os.path.join(folder_paths.get_input_directory(), "masks")
+    if not _inside(folder_paths.get_input_directory(), out_dir):
+        raise ValueError("Thu muc mask nam ngoai input")
     os.makedirs(out_dir, exist_ok=True)
     stem = re.sub(r"[^\w\-. ]", "_", os.path.splitext(os.path.basename(src_path))[0])[:80] or "image"
-    n, name = 0, stem + "_mask.png"
-    while os.path.exists(os.path.join(out_dir, name)):
-        n += 1
-        name = f"{stem}_mask_{n}.png"
-    rgba.save(os.path.join(out_dir, name), format="PNG", compress_level=1)
+    for n in range(10000):
+        name = f"{stem}_mask_{n}.png" if n else f"{stem}_mask.png"
+        path = os.path.join(out_dir, name)
+        try:
+            output = open(path, "xb")
+        except FileExistsError:
+            continue
+        try:
+            with output:
+                rgba.save(output, format="PNG", compress_level=1, pnginfo=pnginfo)
+        except Exception:
+            os.unlink(path)
+            raise
+        break
+    else:
+        raise OSError("Khong con ten file mask kha dung")
     return "masks/" + name
 
 

@@ -16,8 +16,6 @@ import os
 import re
 import random
 
-import folder_paths
-
 
 class ShankWildcardEncode:
     """
@@ -47,20 +45,24 @@ class ShankWildcardEncode:
     def encode(self, text, display_text="", seed=0):
         # display_text là ô hiển thị mặc định, không được dùng làm input thực tế
         if not text:
-            return ("",)
+            return {"ui": {"text": [""]}, "result": ("",)}
 
         rng = random.Random(seed)
 
         # Thư mục chứa file wildcard (nếu có)
-        wildcard_dir = os.path.join(os.path.dirname(__file__), "wildcards")
+        wildcard_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), "wildcards"))
 
         def replace_wildcard(match):
             content = match.group(1)
 
             # Trường hợp tham chiếu file: {ten_file.txt}
             if content.endswith(".txt") and "|" not in content:
-                file_path = os.path.join(wildcard_dir, content)
-                if os.path.isfile(file_path):
+                file_path = os.path.realpath(os.path.join(wildcard_dir, content))
+                try:
+                    inside = os.path.commonpath([wildcard_dir, file_path]) == wildcard_dir
+                except ValueError:
+                    inside = False
+                if inside and os.path.isfile(file_path):
                     try:
                         with open(file_path, "r", encoding="utf-8") as f:
                             lines = [line.strip() for line in f if line.strip()]
@@ -86,7 +88,7 @@ class ShankWildcardEncode:
                 break
             result = new_result
 
-        return (result,)
+        return {"ui": {"text": [result]}, "result": (result,)}
 
 
 # Đăng ký node

@@ -83,3 +83,12 @@ Sau khi duyệt, mọi người dùng ComfyUI Manager có thể tìm và cài đ
 ## License
 
 MIT
+
+### Thư mục ảnh cho Load Image + Metadata
+
+Node đọc ảnh trong `ComfyUI/input` và thư mục Drive được cấu hình trên server.
+Mặc định thư mục Drive là `/content/drive/MyDrive/SD-Data/Export/ComfyUI`.
+Nếu lưu ảnh ở nơi khác, đặt biến môi trường `SHANK_COMFY_DRIVE_ROOT` thành
+đường dẫn tuyệt đối của thư mục ảnh trước khi khởi động ComfyUI. Sau đó cập
+nhật ô `drive_folder` trong workflow đã lưu để trỏ vào thư mục đó hoặc một
+thư mục con. Ô này hỗ trợ mẫu ngày như `%Y-%m-%d`.
