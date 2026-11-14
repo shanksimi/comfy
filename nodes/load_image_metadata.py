@@ -347,7 +347,7 @@ def _load_one(path):
     return tensor, mask, pos, neg, metadata, stem, os.path.dirname(path)
 
 
-class LoadImageWithMetadata:
+class ShankImageLoad:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -417,7 +417,7 @@ function el(tag, style, text) {
 let lastTab = "input_folder";
 
 app.registerExtension({
-  name: "LoadImageWithMetadata.Browser",
+  name: "ShankImageLoad.Browser",
   nodeCreated(node) {
     if (node.comfyClass === "ShankWildcardEncode") {
       const onExecuted = node.onExecuted;
@@ -431,7 +431,7 @@ app.registerExtension({
       };
       return;
     }
-    if (node.comfyClass !== "LoadImageWithMetadata") return;
+    if (node.comfyClass !== "ShankImageLoad") return;
     const get = (n) => (node.widgets || []).find((x) => x.name === n);
     const folderValue = () => { const w = get("drive_folder"); return w ? String(w.value || "") : ""; };
     const getEntries = () => {
@@ -464,7 +464,7 @@ app.registerExtension({
             node.setSize([Math.max(node.size[0], sz[0]), sz[1]]);
           }
           node.setDirtyCanvas(true, true);
-        } catch (e) { console.warn("LoadImageWithMetadata clear preview:", e); }
+        } catch (e) { console.warn("ShankImageLoad clear preview:", e); }
         return;
       }
       Promise.all(entries.map((e) => new Promise((res) => {
@@ -480,7 +480,7 @@ app.registerExtension({
           if (node.setSizeForImage) node.setSizeForImage();
           node.setDirtyCanvas(true, true);
         } catch (e) {
-          console.warn("LoadImageWithMetadata preview:", e);
+          console.warn("ShankImageLoad preview:", e);
         }
       });
     }
@@ -494,7 +494,7 @@ app.registerExtension({
         const dom = w.inputEl || w.element;
         if (dom && dom.value !== undefined && dom.value !== v) dom.value = v;
         if (w.callback) w.callback(v);
-      } catch (e) { console.warn("LoadImageWithMetadata setEntries:", e); }
+      } catch (e) { console.warn("ShankImageLoad setEntries:", e); }
       // tre 1 nhip de ComfyUI xu ly xong su kien click nut truoc khi doi giao dien node
       requestAnimationFrame(() => {
         try { updatePreview(); node.setDirtyCanvas(true, true); } catch (e) {}
@@ -1238,5 +1238,5 @@ def _register_routes():
 _register_web_extension()
 _register_routes()
 
-NODE_CLASS_MAPPINGS = {"LoadImageWithMetadata": LoadImageWithMetadata}
-NODE_DISPLAY_NAME_MAPPINGS = {"LoadImageWithMetadata": "Load Image + Metadata"}
+NODE_CLASS_MAPPINGS = {"ShankImageLoad": ShankImageLoad}
+NODE_DISPLAY_NAME_MAPPINGS = {"ShankImageLoad": "Load Image + Metadata"}

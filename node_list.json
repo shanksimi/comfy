@@ -1,5 +1,5 @@
 {
-  "LoadImageWithMetadata": {
+  "ShankImageLoad": {
     "display_name": "Load Image + Metadata",
     "description": "Load ảnh + đọc metadata (A1111/ComfyUI), chọn nhiều ảnh, vẽ mask. Output: IMAGE, MASK, POSITIVE, NEGATIVE, METADATA, FILENAME, FOLDER.",
     "authors": ["shanksimi"],
