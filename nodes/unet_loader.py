@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from nodes import UNETLoader
 
 
@@ -27,14 +29,19 @@ def _model_info(path):
     with urlopen("https://civitai.com/api/v1/model-versions/by-hash/" + digest.hexdigest(),
                  timeout=15) as response:
         version = json.load(response)
-    model = version.get("model") or {}
+    return _civitai_info(version)
+
+
+def _civitai_info(version):
+    model = version.get("model")
+    model_name = model.get("name") if isinstance(model, dict) else model
     model_id = version.get("modelId")
     version_id = version.get("id")
     url = None
     if type(model_id) is int and type(version_id) is int:
         url = f"https://civitai.com/models/{model_id}?modelVersionId={version_id}"
     return {
-        "model": model.get("name"),
+        "model": model_name,
         "version": version.get("name"),
         "base_model": version.get("baseModel"),
         "trained_words": version.get("trainedWords") or [],
@@ -42,14 +49,63 @@ def _model_info(path):
     }
 
 
-def _read_info(sidecar):
+def _read_json(sidecar):
     import json
 
     try:
         data = json.loads(sidecar.read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError):
         return None
-    return data if isinstance(data, dict) and "trained_words" in data else None
+    return data if isinstance(data, dict) else None
+
+
+def _read_local_metadata(sidecar):
+    data = _read_json(sidecar)
+    if data is None:
+        return None
+
+    raw = data.get("raw")
+    version = raw.get("civitai") if isinstance(raw, dict) else data.get("civitai")
+    if not isinstance(version, dict):
+        version = data
+    info = _civitai_info(version)
+    info["model"] = info["model"] or data.get("model_name") or data.get("name")
+    info["version"] = data.get("version") or data.get("version_name") or (
+        info["version"] if version is not data or isinstance(data.get("model"), dict) or "modelId" in data else None
+    )
+    info["base_model"] = data.get("baseModel") or data.get("base_model") or info["base_model"]
+
+    def words(items):
+        for item in items if isinstance(items, list) else []:
+            word = item.get("word") if isinstance(item, dict) else item
+            if isinstance(word, str) and word.strip():
+                yield word.strip()
+
+    info["trained_words"] = list(dict.fromkeys([
+        *words(data.get("trainedWords")),
+        *words(data.get("trained_words")),
+        *words(data.get("trigger_words")),
+        *words(info["trained_words"]),
+        *words(version.get("triggerWords")),
+    ]))
+    links = data.get("links")
+    links = [data.get("url"), *(links if isinstance(links, list) else [])]
+    if not info["url"]:
+        info["url"] = next((link for link in links if isinstance(link, str)
+                            and link.startswith("https://civitai.com/models/")), None)
+    return info if any(info.values()) else None
+
+
+def _read_info(sidecar, local_sidecars):
+    for candidate in local_sidecars:
+        try:
+            info = _read_local_metadata(candidate)
+        except OSError:
+            info = None
+        if info is not None:
+            return info
+    data = _read_json(sidecar)
+    return data if data is not None and "trained_words" in data else None
 
 
 def _save_info(sidecar, data):
@@ -70,7 +126,6 @@ def _save_info(sidecar, data):
 
 def _register_info_route():
     import asyncio
-    from pathlib import Path
     from urllib.error import HTTPError, URLError
 
     import folder_paths
@@ -81,10 +136,10 @@ def _register_info_route():
     failures = {}
     worker = asyncio.Semaphore(1)
 
-    async def lookup(path, sidecar):
+    async def lookup(path, sidecar, local_sidecars):
         try:
             async with worker:
-                if await asyncio.to_thread(_read_info, sidecar) is not None:
+                if await asyncio.to_thread(_read_info, sidecar, local_sidecars) is not None:
                     return
                 data = await asyncio.to_thread(_model_info, path)
                 await asyncio.to_thread(_save_info, sidecar, data)
@@ -113,8 +168,12 @@ def _register_info_route():
         if path is None:
             return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
         sidecar = Path(path + ".shank-info.json")
+        model_path = Path(path)
+        local_sidecars = [model_path.with_suffix(".metadata.json"), Path(path + ".metadata.json")]
+        if category == "loras":
+            local_sidecars.insert(0, Path(path + ".rgthree-info.json"))
         try:
-            saved = await asyncio.to_thread(_read_info, sidecar)
+            saved = await asyncio.to_thread(_read_info, sidecar, local_sidecars)
         except OSError:
             return web.json_response({"error": "Không đọc được file thông tin model."}, status=500)
         if saved is not None:
@@ -123,7 +182,7 @@ def _register_info_route():
             return web.json_response({"error": failures[path]}, status=502)
         if path not in pending:
             failures.pop(path, None)
-            pending[path] = asyncio.create_task(lookup(path, sidecar))
+            pending[path] = asyncio.create_task(lookup(path, sidecar, local_sidecars))
         return web.json_response({"status": "pending"}, status=202)
 
 
