@@ -309,6 +309,8 @@ của ComfyUI. Hành vi tham chiếu
 
 ### Power Lora Loader (shanksimi)
 
+Khi cài rgthree-comfy, node dùng trực tiếp giao diện và bộ xử lý Power LoRA Loader của rgthree. Workflow Shank cũ được chuyển sang các dòng LoRA của rgthree khi mở. Khi thiếu rgthree-comfy, node dùng giao diện Shank.
+
 Nối MODEL và CLIP nếu có, rồi bấm **Thêm LoRA** để tạo các dòng.
 Mỗi dòng có công tắc bật/tắt và hai ô độ mạnh theo thứ tự MODEL, CLIP.
 Node áp dụng các dòng đang bật theo thứ tự từ trên xuống.
