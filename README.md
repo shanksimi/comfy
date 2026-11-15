@@ -103,6 +103,7 @@ Các liên kết upstream trỏ tới commit đã dùng để đối chiếu khi
 | [`ShankFaceDetailer`](nodes/face_detailer.py) | [Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736) |
 | [`ShankHanDetailer`](nodes/face_detailer.py) | [FaceDetailer của Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736), dùng detector bàn tay và prompt mặc định riêng. |
 | [`ShankUltralyticsDetectorProvider`](nodes/ultralytics_detector.py) | [Impact Subpack · 50c7b71](https://github.com/ltdrdata/ComfyUI-Impact-Subpack/blob/50c7b71a6a224734cc9b21963c6d1926816a97f1/modules/subpack_nodes.py) |
+| [`ShankSAMLoader`](nodes/sam_loader.py) | [Impact Pack · 9e2d41d](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/9e2d41da75c185bf7638f860d5d004035f378e9b/modules/impact/impact_pack.py) |
 
 ## License
 

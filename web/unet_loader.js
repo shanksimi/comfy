@@ -15,11 +15,12 @@ app.registerExtension({
       const heading = document.createElement("h3");
       heading.textContent = name || "Thông tin Civitai";
       const body = document.createElement("div");
-      body.textContent = name ? "Đang đọc SHA-256 và tra Civitai…" : "Hãy chọn model trước.";
+      body.textContent = name ? "Đang kiểm tra thông tin đã lưu…" : "Hãy chọn model trước.";
       const close = document.createElement("button");
       close.textContent = "Đóng";
       close.onclick = () => dialog.close();
-      dialog.addEventListener("close", () => dialog.remove(), { once: true });
+      const currentDialog = dialog;
+      dialog.addEventListener("close", () => currentDialog.remove(), { once: true });
       dialog.append(heading, body, close);
       document.body.append(dialog);
       dialog.showModal();
@@ -27,9 +28,18 @@ app.registerExtension({
       if (!name) return;
 
       try {
-        const response = await api.fetchApi("/shanksimi/unet-info?" + new URLSearchParams({ name }));
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || response.statusText);
+        const query = new URLSearchParams({ name });
+        let data;
+        while (currentDialog.open) {
+          const response = await api.fetchApi("/shanksimi/unet-info?" + query, { cache: "no-store" });
+          data = await response.json();
+          if (!response.ok) throw new Error(data.error || response.statusText);
+          if (response.status !== 202) break;
+          body.textContent = "Đang tra Civitai trong nền. Bạn có thể đóng cửa sổ này và mở lại sau.";
+          query.set("poll", "1");
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        if (!currentDialog.open) return;
         body.replaceChildren();
         for (const [label, value] of [
           ["Model", data.model], ["Phiên bản", data.version], ["Model nền", data.base_model],

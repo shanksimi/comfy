@@ -9,6 +9,7 @@ from .ultimate_sd_upscale import ShankUltimateSDUpscale
 from .batch_to_image import ShankBatchToImage
 from .face_detailer import ShankFaceDetailer, ShankHanDetailer
 from .ultralytics_detector import ShankUltralyticsDetectorProvider
+from .sam_loader import ShankSAMLoader
 from .image_saver_simple import ShankMetadata, ShankImageSaverSimple
 from .image_comparer import ShankImageComparer
 from .power_lora_loader import ShankPowerLoraLoader
@@ -59,5 +60,8 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankSimpleMath"] = "Simple Math (shanksimi)"
 
 NODE_CLASS_MAPPINGS["ShankMetadata"] = ShankMetadata
 NODE_DISPLAY_NAME_MAPPINGS["ShankMetadata"] = "Metadata"
+
+NODE_CLASS_MAPPINGS["ShankSAMLoader"] = ShankSAMLoader
+NODE_DISPLAY_NAME_MAPPINGS["ShankSAMLoader"] = "SAM Loader (shanksimi)"
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

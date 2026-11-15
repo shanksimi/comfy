@@ -42,13 +42,63 @@ def _model_info(path):
     }
 
 
+def _read_info(sidecar):
+    import json
+
+    try:
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError):
+        return None
+    return data if isinstance(data, dict) and "trained_words" in data else None
+
+
+def _save_info(sidecar, data):
+    import json
+    import os
+    from tempfile import NamedTemporaryFile
+
+    temporary = None
+    try:
+        with NamedTemporaryFile(mode="w", encoding="utf-8", dir=sidecar.parent, delete=False) as stream:
+            temporary = stream.name
+            json.dump(data, stream, ensure_ascii=False, indent=2)
+        os.replace(temporary, sidecar)
+    finally:
+        if temporary and os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def _register_info_route():
     import asyncio
+    from pathlib import Path
     from urllib.error import HTTPError, URLError
 
     import folder_paths
     from aiohttp import web
     from server import PromptServer
+
+    pending = {}
+    failures = {}
+    worker = asyncio.Semaphore(1)
+
+    async def lookup(path, sidecar):
+        try:
+            async with worker:
+                if await asyncio.to_thread(_read_info, sidecar) is not None:
+                    return
+                data = await asyncio.to_thread(_model_info, path)
+                await asyncio.to_thread(_save_info, sidecar, data)
+        except HTTPError as error:
+            if error.code == 404:
+                failures[path] = "Civitai chưa có phiên bản khớp với file này."
+            else:
+                failures[path] = f"Civitai trả lỗi HTTP {error.code}."
+        except (URLError, TimeoutError, ValueError, AttributeError):
+            failures[path] = "Không đọc được thông tin từ Civitai."
+        except OSError:
+            failures[path] = "Không đọc được model hoặc không ghi được file thông tin bên cạnh model."
+        finally:
+            pending.pop(path, None)
 
     @PromptServer.instance.routes.get("/shanksimi/unet-info")
     async def info(request):
@@ -58,16 +108,19 @@ def _register_info_route():
         path = folder_paths.get_full_path("diffusion_models", name)
         if path is None:
             return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
+        sidecar = Path(path + ".shank-info.json")
         try:
-            return web.json_response(await asyncio.to_thread(_model_info, path))
-        except HTTPError as error:
-            if error.code == 404:
-                return web.json_response({"error": "Civitai chưa có phiên bản khớp với file này."}, status=404)
-            return web.json_response({"error": f"Civitai trả lỗi HTTP {error.code}."}, status=502)
-        except (URLError, TimeoutError, ValueError):
-            return web.json_response({"error": "Không đọc được thông tin từ Civitai."}, status=502)
+            saved = await asyncio.to_thread(_read_info, sidecar)
         except OSError:
-            return web.json_response({"error": "Không đọc được file model."}, status=500)
+            return web.json_response({"error": "Không đọc được file thông tin model."}, status=500)
+        if saved is not None:
+            return web.json_response(saved)
+        if request.query.get("poll") == "1" and path in failures:
+            return web.json_response({"error": failures[path]}, status=502)
+        if path not in pending:
+            failures.pop(path, None)
+            pending[path] = asyncio.create_task(lookup(path, sidecar))
+        return web.json_response({"status": "pending"}, status=202)
 
 
 _register_info_route()
