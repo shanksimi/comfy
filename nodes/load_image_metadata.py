@@ -419,7 +419,8 @@ let lastTab = "input_folder";
 app.registerExtension({
   name: "ShankImageLoad.Browser",
   nodeCreated(node) {
-    if (node.comfyClass !== "ShankImageLoad") return;
+    const viewOnly = node.comfyClass === "ShankImageSaverSimple";
+    if (!viewOnly && node.comfyClass !== "ShankImageLoad") return;
     const get = (n) => (node.widgets || []).find((x) => x.name === n);
     const folderValue = () => { const w = get("drive_folder"); return w ? String(w.value || "") : ""; };
     const getEntries = () => {
@@ -491,14 +492,16 @@ app.registerExtension({
 
     const browseBtn = node.addWidget("button", "Browse files...", null, () => openBrowser());
     browseBtn.serialize = false;
-    const clearBtn = node.addWidget("button", "Clear selection", null, () => setEntries([]));
-    clearBtn.serialize = false;
+    if (!viewOnly) {
+      const clearBtn = node.addWidget("button", "Clear selection", null, () => setEntries([]));
+      clearBtn.serialize = false;
+    }
 
     // ---- cua so duyet file ----
     function openBrowser() {
       const existing = getEntries();          // anh da chon tu truoc: giu nguyen, chi them vao
       const selected = new Set(existing);
-      let tab = lastTab;
+      let tab = viewOnly ? "drive_folder" : lastTab;
       let data = null;
       let marks = [];
 
@@ -530,15 +533,19 @@ app.registerExtension({
       const clearSelBtn = mkBtn("Clear");
       const uploadBtn = mkBtn("Upload");
       const okBtn = mkBtn("OK");
-      const cancelBtn = mkBtn("Cancel");
+      const cancelBtn = mkBtn(viewOnly ? "Đóng" : "Cancel");
       okBtn.style.background = "#2d7ff9";
       okBtn.style.color = "#fff";
       const fileInput = el("input", { display: "none" });
       fileInput.type = "file";
       fileInput.multiple = true;
       fileInput.accept = "image/*";
-      header.append(inputTab, driveTab, upBtn, selAllBtn, clearSelBtn, uploadBtn, fileInput,
-        el("div", { flex: "1" }), okBtn, cancelBtn);
+      if (viewOnly) {
+        header.append(upBtn, el("div", { flex: "1" }), cancelBtn);
+      } else {
+        header.append(inputTab, driveTab, upBtn, selAllBtn, clearSelBtn, uploadBtn, fileInput,
+          el("div", { flex: "1" }), okBtn, cancelBtn);
+      }
 
       const pathLbl = el("div", {
         padding: "4px 10px", fontSize: "12px", opacity: "0.8", overflow: "hidden",
@@ -555,7 +562,7 @@ app.registerExtension({
         document.removeEventListener("keydown", onKey);
         overlay.remove();
       }
-      function onKey(ev) { if (ev.key === "Escape") close(); }
+      function onKey(ev) { if (ev.key === "Escape" && !overlay.querySelector("dialog[open]")) close(); }
       document.addEventListener("keydown", onKey);
       overlay.addEventListener("mousedown", (ev) => { if (ev.target === overlay) close(); });
       cancelBtn.onclick = close;
@@ -579,6 +586,7 @@ app.registerExtension({
         marks = [];
         body.replaceChildren(el("div", { padding: "10px" }, "Loading..."));
         const params = new URLSearchParams({ source, drive_folder: driveFolder });
+        if (viewOnly) params.set("export_today", "1");
         if (path !== null && path !== undefined) params.set("path", path);
         let d;
         try {
@@ -619,9 +627,6 @@ app.registerExtension({
           });
           const img = el("img", { width: "100%", height: "110px", objectFit: "contain", background: "#111" });
           img.loading = "lazy";
-          img.src = api.apiURL("/load_image_metadata/thumb?" + new URLSearchParams({
-            source: tab, drive_folder: folderValue(), path: join(d.path, f.name),
-          }).toString());
           const badge = el("div", {
             position: "absolute", top: "8px", right: "8px", width: "20px", height: "20px",
             borderRadius: "50%", background: "#2d7ff9", color: "#fff", display: "none",
@@ -667,7 +672,53 @@ app.registerExtension({
               deleteBtn.disabled = false;
             }
           };
-          t.append(editBtn, deleteBtn);
+          if (!viewOnly) t.append(editBtn, deleteBtn);
+          const metadataBadges = el("div", {
+            position: "absolute", bottom: "22px", right: "8px", display: "flex", gap: "4px",
+          });
+          t.append(metadataBadges);
+          img.addEventListener("load", async () => {
+            const query = new URLSearchParams({ entry: f.value, drive_folder: driveFolder });
+            try {
+              const response = await api.fetchApi("/load_image_metadata/metadata?" + query, { cache: "no-store" });
+              if (!response.ok || !t.isConnected) return;
+              const metadata = await response.json();
+              if (metadata.parameters) {
+                const info = mkBtn("ⓘ");
+                info.title = "Xem thông số Civitai / A1111";
+                info.onclick = event => {
+                  event.stopPropagation();
+                  const dialog = el("dialog", {
+                    width: "min(680px, 85vw)", color: "var(--input-text, #ddd)",
+                    background: "var(--comfy-menu-bg, #202020)",
+                  });
+                  const closeInfo = mkBtn("Đóng");
+                  closeInfo.onclick = () => dialog.close();
+                  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+                  dialog.append(el("h3", null, f.name), el("pre", {
+                    whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: "60vh", overflow: "auto",
+                  }, metadata.parameters), closeInfo);
+                  overlay.append(dialog);
+                  dialog.showModal();
+                };
+                metadataBadges.append(info);
+              }
+              if (metadata.has_workflow) {
+                const comfy = el("span", {
+                  background: "#235ea8", color: "#fff", borderRadius: "4px", padding: "4px 6px",
+                  alignSelf: "center",
+                }, "◆ Comfy");
+                comfy.title = "Có workflow ComfyUI nhúng";
+                metadataBadges.append(comfy);
+              }
+            } catch (error) {
+              console.debug("ShankImageLoad metadata:", error);
+            }
+          }, { once: true });
+          img.src = api.apiURL("/load_image_metadata/thumb?" + new URLSearchParams({
+            source: tab, drive_folder: folderValue(), path: join(d.path, f.name),
+          }).toString());
+
           const mark = () => {
             const on = selected.has(f.value);
             badge.style.display = on ? "flex" : "none";
@@ -675,6 +726,21 @@ app.registerExtension({
           };
           marks.push(mark);
           t.onclick = () => {
+            if (viewOnly) {
+              const dialog = el("dialog", { maxWidth: "95vw", background: "var(--comfy-menu-bg, #202020)" });
+              const full = el("img", { display: "block", maxWidth: "85vw", maxHeight: "80vh", objectFit: "contain" });
+              full.alt = f.name;
+              const closeImage = mkBtn("Đóng");
+              closeImage.onclick = () => dialog.close();
+              dialog.addEventListener("close", () => dialog.remove(), { once: true });
+              dialog.append(full, closeImage);
+              overlay.append(dialog);
+              full.src = api.apiURL("/load_image_metadata/full?" + new URLSearchParams({
+                entry: f.value, drive_folder: driveFolder,
+              }));
+              dialog.showModal();
+              return;
+            }
             if (selected.has(f.value)) selected.delete(f.value); else selected.add(f.value);
             refreshMarks();
           };
@@ -1016,6 +1082,22 @@ def _thumb_path_for_entry(entry, template):
     return _join_inside(folder_paths.get_input_directory(), e)[0]
 
 
+def _browser_metadata(path):
+    with Image.open(path) as img:
+        raw = img.info.get("parameters") or _exif_user_comment(img)
+        parameters = (raw if isinstance(raw, str) else "").removeprefix("ASCII\x00\x00\x00").strip("\x00 \r\n")
+        if not {"Steps", "Sampler", "Seed"}.intersection(_parse_a1111(parameters)[2]):
+            parameters = ""
+        try:
+            workflow = json.loads(img.info.get("workflow", ""))
+        except (ValueError, TypeError):
+            workflow = None
+        return {
+            "parameters": parameters,
+            "has_workflow": isinstance(workflow, dict) and isinstance(workflow.get("nodes"), list),
+        }
+
+
 def _make_thumb(path):
     import io
     img = Image.open(path)
@@ -1115,7 +1197,10 @@ def _register_routes():
                 root = _browse_root(source, template)
                 today = ""
                 if source == "drive_folder":
-                    today = os.path.normpath(_resolve_drive_folder(template, DRIVE_UTC_OFFSET_DEFAULT))
+                    if q.get("export_today") == "1" and not template:
+                        template = os.path.join(root, "%Y-%m-%d")
+                    if template:
+                        today = os.path.normpath(_resolve_drive_folder(template, DRIVE_UTC_OFFSET_DEFAULT))
                 rel = q.get("path")
                 if rel is None:  # lan dau mo: Drive thi vao thang thu muc cua ngay
                     rel = ""
@@ -1166,6 +1251,17 @@ def _register_routes():
                 return web.Response(body=data, content_type="image/jpeg",
                                     headers={"Cache-Control": "max-age=3600"})
             except Exception:
+                return web.Response(status=404)
+
+        @routes.get("/load_image_metadata/metadata")
+        async def _metadata(request):
+            q = request.rel_url.query
+            try:
+                path = _thumb_path_for_entry(q.get("entry"), q.get("drive_folder", ""))
+                if not (os.path.isfile(path) and _is_image_name(path)):
+                    return web.Response(status=404)
+                return web.json_response(await asyncio.to_thread(_browser_metadata, path))
+            except (OSError, ValueError):
                 return web.Response(status=404)
 
         @routes.get("/load_image_metadata/full")
