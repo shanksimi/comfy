@@ -100,12 +100,16 @@ def _register_info_route():
         finally:
             pending.pop(path, None)
 
-    @PromptServer.instance.routes.get("/shanksimi/unet-info")
+    routes = PromptServer.instance.routes
+
+    @routes.get("/shanksimi/unet-info")
+    @routes.get("/shanksimi/lora-info")
     async def info(request):
+        category = "loras" if request.path.endswith("/lora-info") else "diffusion_models"
         name = request.query.get("name", "")
-        if name not in folder_paths.get_filename_list("diffusion_models"):
+        if name not in folder_paths.get_filename_list(category):
             return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
-        path = folder_paths.get_full_path("diffusion_models", name)
+        path = folder_paths.get_full_path(category, name)
         if path is None:
             return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
         sidecar = Path(path + ".shank-info.json")
