@@ -1,27 +1,40 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { showModelInfo } from "./model_info_dialog.js";
 
 app.registerExtension({
   name: "shanksimi.PowerLoraLoader",
   nodeCreated(node) {
     if (node.comfyClass !== "ShankPowerLoraLoader") return;
-    const config = node.widgets?.find(widget => widget.name === "loras");
-    if (!config) return;
-    // Preserve the regular widget for workflow and API serialization.
-    config.type = "hidden";
-    config.computeSize = () => [0, -4];
+    const configIndex = node.widgets?.findIndex(widget => widget.name === "loras") ?? -1;
+    if (configIndex < 0) return;
+    const original = node.widgets[configIndex];
+    // The STRING control may be a registered DOM widget. Replacing it keeps its
+    // serialized slot and API name without leaving a rendered input on the canvas.
+    const config = {
+      name: original.name,
+      value: original.value,
+      type: "shank_lora_state",
+      options: { ...original.options, serialize: true },
+      computeSize: () => [0, 0],
+      draw() {},
+    };
+    original.onRemove?.();
+    original.element?.remove();
+    node.widgets[configIndex] = config;
     const panel = document.createElement("div");
     panel.style.cssText = "display:flex;flex-direction:column;gap:4px;box-sizing:border-box;width:100%";
     const strengthMode = "Show Strengths";
     const splitMode = "Separate Model & Clip";
     let choices = [];
     let rows = [];
+    let infoDialog;
 
     function update() {
       config.value = JSON.stringify(rows);
     }
 
-    const panelHeight = () => (rows.length + 1) * 30 + 4;
+    const panelHeight = () => (rows.length + 1) * 25 + 4;
 
     function render() {
       panel.replaceChildren();
@@ -30,22 +43,20 @@ app.registerExtension({
         const isEmpty = row === emptyRow;
         const separate = node.properties?.[strengthMode] === splitMode || row.model !== row.clip;
         const line = document.createElement("div");
-        const columns = separate ? "54px 54px" : "64px";
-        line.style.cssText = `display:grid;grid-template-columns:30px minmax(0,1fr) ${columns} 24px;gap:4px;align-items:center;height:26px;flex-shrink:0`;
+        const columns = separate ? "44px 44px" : "52px";
+        line.style.cssText = `display:grid;grid-template-columns:17px minmax(0,1fr) 18px ${columns} 16px;gap:4px;align-items:center;height:21px;flex-shrink:0;padding:0 6px;border-radius:11px;background:var(--comfy-input-bg,#202020);color:var(--input-text,#ddd);font:12px sans-serif`;
+        const chromelessButton = "border:0;background:transparent;color:inherit;padding:0;cursor:pointer;font:inherit";
         const toggle = document.createElement("button");
         toggle.type = "button";
         toggle.setAttribute("role", "switch");
         toggle.setAttribute("aria-label", "Bật/tắt LoRA");
         toggle.title = "Bật/tắt LoRA";
         toggle.disabled = isEmpty;
-        toggle.style.cssText = "position:relative;width:34px;height:20px;padding:0;border:0;border-radius:10px;cursor:pointer";
-        const thumb = document.createElement("span");
-        thumb.style.cssText = "position:absolute;top:3px;width:14px;height:14px;border-radius:50%;background:white;pointer-events:none";
-        toggle.append(thumb);
+        toggle.style.cssText = chromelessButton;
         const showEnabled = () => {
           toggle.setAttribute("aria-checked", String(Boolean(row.enabled)));
-          toggle.style.background = row.enabled ? "#27834c" : "#666";
-          thumb.style.left = row.enabled ? "17px" : "3px";
+          toggle.textContent = row.enabled ? "●" : "○";
+          toggle.style.color = row.enabled ? "#a7db74" : "var(--descrip-text,#888)";
         };
         toggle.onclick = () => {
           row.enabled = !row.enabled;
@@ -54,12 +65,13 @@ app.registerExtension({
         };
         showEnabled();
         const select = document.createElement("select");
-        select.style.cssText = "flex:1;min-width:0";
-        select.title = "Chọn file LoRA";
+        select.style.cssText = "width:100%;min-width:0;border:0;background:transparent;color:inherit;font:inherit;text-overflow:ellipsis";
+        select.title = row.name || "Chọn file LoRA";
         select.disabled = isEmpty && choices.length === 0;
         select.add(new Option(isEmpty ? "+ Thêm LoRA" : "Chọn LoRA", ""));
         for (const name of new Set([...choices, row.name].filter(Boolean))) {
-          select.add(new Option(name, name));
+          const label = name === row.name ? name.split(/[\\/]/).pop() : name;
+          select.add(new Option(label, name));
         }
         select.value = row.name;
         select.onchange = () => {
@@ -84,7 +96,7 @@ app.registerExtension({
           input.title = label;
           input.setAttribute("aria-label", label);
           input.disabled = isEmpty;
-          input.style.cssText = "width:100%;min-width:0;box-sizing:border-box";
+          input.style.cssText = "width:100%;min-width:0;box-sizing:border-box;border:0;background:transparent;color:inherit;text-align:right;font:inherit;font-variant-numeric:tabular-nums";
           input.onchange = () => {
             if (Number.isFinite(input.valueAsNumber)) {
               row[key] = input.valueAsNumber;
@@ -95,14 +107,28 @@ app.registerExtension({
           };
           return input;
         };
+        const info = document.createElement("button");
+        info.type = "button";
+        info.textContent = "ⓘ";
+        info.title = "Thông tin LoRA trên Civitai";
+        info.setAttribute("aria-label", info.title);
+        info.style.cssText = chromelessButton;
+        info.disabled = isEmpty;
+        info.style.visibility = isEmpty ? "hidden" : "";
+        info.onclick = () => {
+          if (!infoDialog?.open) {
+            void showModelInfo(row.name, "lora-info", dialog => { infoDialog = dialog; });
+          }
+        };
         const remove = document.createElement("button");
         remove.type = "button";
         remove.textContent = "×";
         remove.title = "Xóa dòng LoRA";
+        remove.style.cssText = chromelessButton;
         remove.onclick = () => { rows.splice(index, 1); update(); render(); };
         remove.disabled = isEmpty;
         remove.style.visibility = isEmpty ? "hidden" : "";
-        line.append(toggle, select, strength("model", separate ? "MODEL strength" : "LoRA strength"));
+        line.append(toggle, select, info, strength("model", separate ? "MODEL strength" : "LoRA strength"));
         if (separate) line.append(strength("clip", "CLIP strength"));
         line.append(remove);
         panel.append(line);
