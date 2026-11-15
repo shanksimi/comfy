@@ -21,7 +21,7 @@ class ShankSeed:
         }
 
     @classmethod
-    def IS_CHANGED(cls, seed):
+    def IS_CHANGED(cls, seed, **kwargs):
         return float("nan") if seed in cls.MODES else seed
 
     def get_seed(self, seed, prompt=None, extra_pnginfo=None, unique_id=None):
