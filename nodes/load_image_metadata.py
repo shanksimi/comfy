@@ -632,8 +632,12 @@ app.registerExtension({
             borderRadius: "50%", background: "#2d7ff9", color: "#fff", display: "none",
             alignItems: "center", justifyContent: "center", fontSize: "13px",
           }, "\u2713");
-          t.append(img, badge,
-            el("div", { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, f.name));
+          const fileLabel = el("div", {
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            direction: "rtl", textAlign: "right",
+          });
+          fileLabel.append(el("bdi", null, f.name));
+          t.append(img, badge, fileLabel);
           t.title = f.name;
           const editBtn = el("div", {
             position: "absolute", top: "8px", left: "8px", width: "22px", height: "22px",
