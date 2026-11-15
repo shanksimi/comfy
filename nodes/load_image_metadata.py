@@ -733,11 +733,15 @@ app.registerExtension({
               const closeImage = mkBtn("Đóng");
               closeImage.onclick = () => dialog.close();
               dialog.addEventListener("close", () => dialog.remove(), { once: true });
-              dialog.append(full, closeImage);
+              const query = new URLSearchParams({ entry: f.value, drive_folder: driveFolder });
+              const fullUrl = "/load_image_metadata/full?";
+              full.src = api.apiURL(fullUrl + query);
+              query.set("download", "1");
+              const download = el("a", { ...baseBtn, display: "inline-block", marginRight: "6px" }, "Tải ảnh gốc");
+              download.href = api.apiURL(fullUrl + query);
+              download.download = f.name;
+              dialog.append(full, download, closeImage);
               overlay.append(dialog);
-              full.src = api.apiURL("/load_image_metadata/full?" + new URLSearchParams({
-                entry: f.value, drive_folder: driveFolder,
-              }));
               dialog.showModal();
               return;
             }
@@ -1183,6 +1187,8 @@ def _save_mask_png(src_path, mask_bytes):
 def _register_routes():
     try:
         import asyncio
+        from urllib.parse import quote
+
         from aiohttp import web
         from server import PromptServer
 
@@ -1271,6 +1277,11 @@ def _register_routes():
                 p = _thumb_path_for_entry(q.get("entry"), q.get("drive_folder", ""))
                 if not (os.path.isfile(p) and _is_image_name(p)):
                     return web.Response(status=404)
+                if q.get("download") == "1":
+                    filename = quote(os.path.basename(p), safe="")
+                    return web.FileResponse(p, headers={
+                        "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+                    })
                 data = await asyncio.get_running_loop().run_in_executor(None, _make_full_png, p)
                 return web.Response(body=data, content_type="image/png",
                                     headers={"Cache-Control": "no-cache"})
