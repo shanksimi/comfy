@@ -20,17 +20,13 @@ class ShankFaceDetailer:
 
     @staticmethod
     def upstream():
-        from nodes import NODE_CLASS_MAPPINGS
+        from ._impact_detailer.detailer import FaceDetailer
 
-        return NODE_CLASS_MAPPINGS.get("FaceDetailer")
+        return FaceDetailer
 
     @classmethod
     def INPUT_TYPES(cls):
         upstream = cls.upstream()
-        if upstream is None:
-            return {"required": {"image": ("IMAGE", {
-                "tooltip": "Cài ComfyUI-Impact-Pack để hiện các đầu vào của FaceDetailer.",
-            })}}
         schema = upstream.INPUT_TYPES()
         required = schema["required"]
         wildcard_type, options = required["wildcard"]
@@ -40,8 +36,6 @@ class ShankFaceDetailer:
 
     def detail(self, **inputs):
         upstream = self.upstream()
-        if upstream is None:
-            raise RuntimeError("Cần cài ComfyUI-Impact-Pack để chạy FaceDetailer.")
         return getattr(upstream(), upstream.FUNCTION)(**inputs)
 
 

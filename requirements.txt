@@ -6,3 +6,22 @@ PyYAML
 piexif
 requests
 tqdm
+segment-anything
+ultralytics>=8.3.162
+opencv-python-headless
+huggingface_hub
+scipy
+filelock
+einops
+scikit-image
+python-dateutil
+mediapipe>=0.8.0
+omegaconf
+addict
+yacs
+trimesh
+rtree
+albumentationsx
+scikit-learn
+matplotlib
+onnxruntime-gpu; (platform_system == "Windows" or platform_system == "Linux") and (platform_machine == "AMD64" or platform_machine == "x86_64")

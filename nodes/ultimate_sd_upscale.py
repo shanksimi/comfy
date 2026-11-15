@@ -37,16 +37,13 @@ class ShankUltimateSDUpscale:
 
     @staticmethod
     def upstream():
-        from nodes import NODE_CLASS_MAPPINGS
+        from ._ultimate_upscale.usdu_nodes import UltimateSDUpscale
 
-        return NODE_CLASS_MAPPINGS.get("UltimateSDUpscale")
+        return UltimateSDUpscale
 
     @classmethod
     def INPUT_TYPES(cls):
         upstream = cls.upstream()
-        if upstream is None:
-            return {"required": {"image": ("IMAGE",)}}
-
         schema = upstream.INPUT_TYPES()
         return {
             group: {
@@ -59,6 +56,4 @@ class ShankUltimateSDUpscale:
 
     def upscale(self, **inputs):
         upstream = self.upstream()
-        if upstream is None:
-            raise RuntimeError("Cần cài ComfyUI_UltimateSDUpscale để chạy node này.")
         return getattr(upstream(), upstream.FUNCTION)(**inputs)
