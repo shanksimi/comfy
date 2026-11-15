@@ -313,7 +313,8 @@ của ComfyUI. Hành vi tham chiếu
 
 ### Power Lora Loader (shanksimi)
 
-Node dùng giao diện Shank và bộ nạp LoRA của ComfyUI. rgthree-comfy là nguồn tham chiếu.
+Node dùng giao diện Shank và bộ nạp LoRA của ComfyUI. Workflow đã lưu bằng
+giao diện rgthree và API prompt có các đầu vào `lora_*` vẫn đọc được.
 
 Nối MODEL và CLIP nếu có, rồi bấm **Thêm LoRA** để tạo các dòng.
 Mỗi dòng có công tắc bật/tắt và hai ô độ mạnh theo thứ tự MODEL, CLIP.
@@ -346,9 +347,10 @@ các node trong một nhóm của graph hiện tại. Bản tích hợp tham chi
 
 ### SAM Loader (shanksimi)
 
-Nạp weights từ `ComfyUI/models/sams/` qua thư viện `segment-anything`.
-Weights SAM 2 hoặc SAM 2.1 cần thư viện Python `sam2` và hỗ trợ dự đoán
-mask ảnh. SAM 2 video và EfficientSAM hiện chưa được tích hợp.
+Nạp weights từ `ComfyUI/models/sams/` hoặc đường dẫn `sams` trong
+`extra_model_paths.yaml`. `requirements.txt` cài `segment-anything` cho SAM
+và `sam2` cho SAM 2/2.1 trên Python 3.10 trở lên. Node hỗ trợ tạo mask ảnh
+tĩnh. SAM 2 video và EfficientSAM cần các node chuyên dụng.
 
 
 #### LoRA theo block và Nunchaku
