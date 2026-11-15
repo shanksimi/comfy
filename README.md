@@ -351,8 +351,9 @@ các node trong một nhóm của graph hiện tại. Bản tích hợp tham chi
 
 Nạp weights từ `ComfyUI/models/sams/` hoặc đường dẫn `sams` trong
 `extra_model_paths.yaml`. `requirements.txt` cài `segment-anything` cho SAM
-và `sam2` cho SAM 2/2.1 trên Python 3.10 trở lên. Node hỗ trợ tạo mask ảnh
-tĩnh. SAM 2 video và EfficientSAM cần các node chuyên dụng.
+đời đầu. Chỉ khi dùng weights SAM 2/2.1, cài thêm bằng Python của ComfyUI
+với `python -m pip install -r requirements-sam2.txt`. Node hỗ trợ tạo mask
+ảnh tĩnh. SAM 2 video và EfficientSAM cần các node chuyên dụng.
 
 
 #### LoRA theo block và Nunchaku

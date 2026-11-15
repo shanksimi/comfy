@@ -87,7 +87,7 @@ class ShankSAMLoader:
                 from sam2.build_sam import build_sam2
                 from sam2.sam2_image_predictor import SAM2ImagePredictor
             except ImportError as error:
-                raise RuntimeError("Weights SAM 2 cần thư viện Python sam2.") from error
+                raise RuntimeError("Weights SAM 2 cần thư viện sam2. Cài thêm bằng python -m pip install -r requirements-sam2.txt.") from error
             model = build_sam2(config, device=device)
             model.load_state_dict(load_torch_file(path, safe_load=True)["model"])
             predictor = SAM2ImagePredictor(model)
