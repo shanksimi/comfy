@@ -2,10 +2,10 @@
 name = "comfyui-shanksimi"
 description = "Bộ custom node cho ComfyUI: đọc metadata ảnh, mã hóa wildcard prompt, seed."
 version = "1.0.0"
-license = { text = "MIT" }
+license = { text = "MIT AND Apache-2.0 AND GPL-3.0-only AND AGPL-3.0-only" }
 authors = [{ name = "shanksimi" }]
 requires-python = ">=3.9"
-dependencies = ["PyYAML"]
+dependencies = ["PyYAML", "piexif", "requests", "tqdm", "segment-anything", "ultralytics>=8.3.162", "opencv-python-headless", "huggingface_hub", "scipy", "filelock", "einops", "scikit-image", "python-dateutil", "mediapipe>=0.8.0", "omegaconf", "addict", "yacs", "trimesh", "rtree", "albumentationsx", "scikit-learn", "matplotlib", "onnxruntime-gpu; (platform_system == \"Windows\" or platform_system == \"Linux\") and (platform_machine == \"AMD64\" or platform_machine == \"x86_64\")", "sam2 @ git+https://github.com/facebookresearch/sam2.git@2b90b9f5ceec907a1c18123530e92e794ad901a4 ; python_version >= \"3.10\""]
 
 [project.urls]
 Repository = "https://github.com/shanksimi/comfy"

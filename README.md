@@ -83,6 +83,9 @@ Sau khi duyệt, mọi người dùng ComfyUI Manager có thể tìm và cài đ
 ## Nguồn tham chiếu của các node
 
 Các liên kết upstream trỏ tới commit đã dùng để đối chiếu khi tích hợp.
+Mục tiêu là mỗi node Shank thực hiện được chức năng của node tham chiếu
+mà chỉ cần cài gói Shank cùng thư viện và weights cần thiết. Các node đang
+gọi trực tiếp extension khác được ghi rõ bên dưới.
 
 | Node | Nguồn tham chiếu |
 | --- | --- |
@@ -96,18 +99,22 @@ Các liên kết upstream trỏ tới commit đã dùng để đối chiếu khi
 | [`ShankMetadata`](nodes/image_saver_simple.py) | [Image Saver · 2cccbf0](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes.py#L149) |
 | [`ShankImageComparer`](nodes/image_comparer.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/tree/bc48c6aaeca87bedbc14245d89f9bc6be37a630e) |
 | [`ShankPowerLoraLoader`](nodes/power_lora_loader.py) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/py/power_lora_loader.py) |
-| [`ShankAIOAuxPreprocessor`](nodes/aio_aux_preprocessor.py) | [ControlNet Aux · a587a4c](https://github.com/Fannovel16/comfyui_controlnet_aux/blob/a587a4c1594524c1d2de5cd1a86cd868ff448e1c/__init__.py#L84) |
+| [`ShankAIOAuxPreprocessor`](nodes/aio_aux_preprocessor.py) | [ControlNet Aux · b9abafa](https://github.com/Fannovel16/comfyui_controlnet_aux/blob/b9abafa1019e230ebd674e4ae93f11bdf9d8dfc2/__init__.py#L84) |
 | [`ShankReroutePrimitive`](nodes/reroute_primitive.py) | [Custom Scripts · 609f3af](https://github.com/pythongosssss/ComfyUI-Custom-Scripts/blob/609f3afaa74b2f88ef9ce8d939626065e3247469/web/js/reroutePrimitive.js) |
 | [`ShankUltimateSDUpscale`](nodes/ultimate_sd_upscale.py) | [Ultimate SD Upscale · a5547db](https://github.com/ssitu/ComfyUI_UltimateSDUpscale/blob/a5547db9e1d07d3318bb21e9e9c474f4c1e9c8df/usdu_nodes.py#L109) |
 | [`ShankBatchToImage`](nodes/batch_to_image.py) | [Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/util_nodes.py#L418) |
-| [`ShankFaceDetailer`](nodes/face_detailer.py) | [Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736) |
-| [`ShankHanDetailer`](nodes/face_detailer.py) | [FaceDetailer của Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736), dùng detector bàn tay và prompt mặc định riêng. |
+| [`ShankFaceDetailer`](nodes/face_detailer.py) | [Impact Pack · 61b9388](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/61b9388388ef127987dc4277a7ca94b985d0d075/modules/impact/impact_pack.py#L767) |
+| [`ShankHanDetailer`](nodes/face_detailer.py) | [FaceDetailer của Impact Pack · 61b9388](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/61b9388388ef127987dc4277a7ca94b985d0d075/modules/impact/impact_pack.py#L767), dùng detector bàn tay và prompt mặc định riêng. |
 | [`ShankUltralyticsDetectorProvider`](nodes/ultralytics_detector.py) | [Impact Subpack · 50c7b71](https://github.com/ltdrdata/ComfyUI-Impact-Subpack/blob/50c7b71a6a224734cc9b21963c6d1926816a97f1/modules/subpack_nodes.py) |
 | [`ShankSAMLoader`](nodes/sam_loader.py) | [Impact Pack · 9e2d41d](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/9e2d41da75c185bf7638f860d5d004035f378e9b/modules/impact/impact_pack.py) |
+| [`ShankBasicInfo`](nodes/basic_info.py) | Node nội bộ dựa trên subgraph Basic Info. Tham chiếu [Sampler và Scheduler Selector của Image Saver](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_selectors.py). |
+| [`ShankFastGroupsBypasser`](web/fast_groups_bypasser.js) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/web/comfyui/fast_groups_bypasser.js) |
+
 
 ## License
 
-MIT
+Mã Shank phát hành theo MIT. Mã bên thứ ba đi kèm có giấy phép riêng,
+gồm GPL-3.0 cho Ultimate SD Upscale và AGPL-3.0 cho mã detector từ Impact Subpack.
 
 ### Thư mục ảnh cho Load Image + Metadata
 
@@ -169,8 +176,8 @@ Khi queue ở chế độ **populate** với prompt tĩnh và seed trực tiếp
 `ShankSeed`, bản workflow gửi đi lưu prompt đã bung ở chế độ **reproduce**.
 Input chỉ có giá trị lúc thực thi được xử lý trong node.
 
-Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với ComfyUI-Inspire-Pack hoặc
-`<lora:tên:0.8:LOADER=nunchaku>` với ComfyUI-nunchaku.
+Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với mã LBW đi kèm hoặc
+`<lora:tên:0.8:LOADER=nunchaku>` với Nunchaku.
 
 ### U-Net Loader with Filename (shanksimi)
 
@@ -180,15 +187,13 @@ Hành vi tham chiếu [UNETLoaderWithName của Image Saver](https://github.com/
 
 ### AIO Aux Preprocessor (shanksimi)
 
-`ShankAIOAuxPreprocessor` gọi node `AIO_Preprocessor` của
-[comfyui_controlnet_aux](https://github.com/Fannovel16/comfyui_controlnet_aux/blob/a587a4c1594524c1d2de5cd1a86cd868ff448e1c/__init__.py).
-Cài extension đó và khởi động lại ComfyUI để dùng danh sách preprocessor và
-model của nó. Khi extension chưa có, node chỉ hiện lựa chọn `none` để trả
-ảnh đầu vào.
+`ShankAIOAuxPreprocessor` dùng mã annotator và wrapper đi kèm gói Shank.
+Nguồn [ControlNet Aux · b9abafa](https://github.com/Fannovel16/comfyui_controlnet_aux/tree/b9abafa1019e230ebd674e4ae93f11bdf9d8dfc2)
+và [giấy phép Apache-2.0](nodes/_controlnet_aux/LICENSE.txt).
+Đặt `AUX_ANNOTATOR_CKPTS_PATH` trước khi mở ComfyUI nếu weights annotator
+nằm trên Drive. Menu hiện các preprocessor đã nạp thành công.
 
-Danh sách lựa chọn AIO tại commit upstream ở trên. Menu trong ComfyUI lấy
-danh sách trực tiếp từ extension đã cài và chỉ hiện các preprocessor mà
-extension nạp được.
+Danh sách tham chiếu:
 
 | ID | Tên hiển thị |
 | --- | --- |
@@ -257,10 +262,11 @@ menu vì ngừng hỗ trợ. Bản này đăng ký node trong mục **utils**.
 Dùng `upscale_by` để chọn hệ số phóng, `denoise` để chỉnh mức vẽ lại và
 `seam_fix_mode` để xử lý đường nối. Mô tả node và tooltip được dịch sang tiếng Việt.
 
-Cài [ComfyUI_UltimateSDUpscale](https://github.com/ssitu/ComfyUI_UltimateSDUpscale)
-để cung cấp bộ xử lý. Bản tích hợp gọi trực tiếp node gốc và dùng các tùy chọn
-của phiên bản đã cài. Tooltip tham chiếu
-[commit `a5547db`](https://github.com/ssitu/ComfyUI_UltimateSDUpscale/blob/a5547db9e1d07d3318bb21e9e9c474f4c1e9c8df/usdu_nodes.py).
+Bộ xử lý dùng mã đi kèm gói Shank tại `nodes/_ultimate_upscale/`,
+gồm [ComfyUI Ultimate SD Upscale · a5547db](https://github.com/ssitu/ComfyUI_UltimateSDUpscale/tree/a5547db9e1d07d3318bb21e9e9c474f4c1e9c8df)
+và [Ultimate Upscale for Automatic1111 · 2322caa](https://github.com/Coyote-A/ultimate-upscale-for-automatic1111/tree/2322caa480535b1011a1f9c18126d85ea444f146).
+Mã tích hợp đổi các import nội bộ sang đường dẫn tương đối. Xem
+[giấy phép GPL-3.0 đi kèm](nodes/_ultimate_upscale/LICENSE).
 
 ### Batch to Image (shanksimi)
 
@@ -270,12 +276,10 @@ Cách hoạt động tham chiếu [Image Batch to Image List của Impact Pack](
 
 ### FaceDetailer (shanksimi)
 
-`ShankFaceDetailer` dùng detector để tìm khuôn mặt hoặc đối tượng, cải thiện
-chi tiết trong từng vùng phát hiện rồi ghép lại vào ảnh. Cần cài
-[ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) và nối
-detector vào `bbox_detector`. Node dùng đầu vào và bộ xử lý của Impact Pack
-đã cài, với mô tả và tooltip đầu ra bằng tiếng Việt. Tham chiếu
-[FaceDetailer tại commit `7ff671a`](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736).
+`ShankFaceDetailer` dùng bộ xử lý Impact Pack đi kèm gói Shank.
+Nối detector vào `bbox_detector`. Tham chiếu
+[Impact Pack · 61b9388](https://github.com/ltdrdata/ComfyUI-Impact-Pack/tree/61b9388388ef127987dc4277a7ca94b985d0d075)
+và [giấy phép GPL-3.0](nodes/_impact_detailer/LICENSE.txt).
 
 ### HandDetailer (shanksimi)
 
@@ -285,8 +289,9 @@ chi tiết bàn tay. Nối detector nhận diện bàn tay vào `bbox_detector`.
 
 ### Ultralytics Detector Provider (shanksimi)
 
-`ShankUltralyticsDetectorProvider` gọi node gốc từ
-[ComfyUI-Impact-Subpack](https://github.com/ltdrdata/ComfyUI-Impact-Subpack).
+`ShankUltralyticsDetectorProvider` dùng thư viện Python `ultralytics` và mã detector
+tích hợp từ [ComfyUI-Impact-Subpack](https://github.com/ltdrdata/ComfyUI-Impact-Subpack),
+kèm [giấy phép AGPL-3.0](nodes/_ultralytics/LICENSE.txt).
 Đặt weights trong `ComfyUI/models/ultralytics/bbox/` hoặc
 `ComfyUI/models/ultralytics/segm/`, chọn model phù hợp rồi nối
 `BBOX_DETECTOR` vào `bbox_detector` của FaceDetailer hoặc HandDetailer.
@@ -294,10 +299,9 @@ Tham chiếu [mã upstream tại commit `50c7b71`](https://github.com/ltdrdata/C
 
 ### Image Saver Simple (shanksimi)
 
-`ShankImageSaverSimple` gọi node lưu ảnh từ
-[ComfyUI-Image-Saver của alexopus](https://github.com/alexopus/ComfyUI-Image-Saver).
-Cài extension đó để dùng các định dạng lưu ảnh, metadata Civitai/A1111,
-nhúng workflow và xem trước ảnh đã lưu. Mô tả và tooltip có tiếng Việt.
+`ShankImageSaverSimple` dùng mã Image Saver đi kèm gói Shank. Mã nguồn tham chiếu
+và giấy phép MIT nằm trong bảng trên và [nodes/_image_saver/LICENSE](nodes/_image_saver/LICENSE).
+Node hỗ trợ metadata Civitai/A1111, nhúng workflow và xem trước ảnh đã lưu.
 
 ### Image Comparer (shanksimi)
 
@@ -309,7 +313,8 @@ của ComfyUI. Hành vi tham chiếu
 
 ### Power Lora Loader (shanksimi)
 
-Khi cài rgthree-comfy, node dùng trực tiếp giao diện và bộ xử lý Power LoRA Loader của rgthree. Workflow Shank cũ được chuyển sang các dòng LoRA của rgthree khi mở. Khi thiếu rgthree-comfy, node dùng giao diện Shank.
+Node dùng giao diện Shank và bộ nạp LoRA của ComfyUI. Workflow đã lưu bằng
+giao diện rgthree và API prompt có các đầu vào `lora_*` vẫn đọc được.
 
 Nối MODEL và CLIP nếu có, rồi bấm **Thêm LoRA** để tạo các dòng.
 Mỗi dòng có công tắc bật/tắt và hai ô độ mạnh theo thứ tự MODEL, CLIP.
@@ -332,10 +337,23 @@ trong tên preset, hoặc chọn **Custom** để dùng width và height nhập 
 
 Nối thông số từ Basic Info, seed, tên model và prompt vào
 `ShankMetadata`. Nối output `metadata` vào cổng cùng tên của
-Image Saver Simple. Node dùng bộ tạo metadata của ComfyUI-Image-Saver.
+Image Saver Simple. Node dùng bộ tạo metadata đi kèm gói Shank.
 
 ### Fast Groups Bypasser (shanksimi)
 
 `ShankFastGroupsBypasser` chạy trên giao diện. Mỗi công tắc bật hoặc bypass
 các node trong một nhóm của graph hiện tại. Bản tích hợp tham chiếu
 [Fast Groups Bypasser của rgthree](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/web/comfyui/fast_groups_bypasser.js).
+
+### SAM Loader (shanksimi)
+
+Nạp weights từ `ComfyUI/models/sams/` hoặc đường dẫn `sams` trong
+`extra_model_paths.yaml`. `requirements.txt` cài `segment-anything` cho SAM
+và `sam2` cho SAM 2/2.1 trên Python 3.10 trở lên. Node hỗ trợ tạo mask ảnh
+tĩnh. SAM 2 video và EfficientSAM cần các node chuyên dụng.
+
+
+#### LoRA theo block và Nunchaku
+
+- `LBW` dùng mã và preset đi kèm từ [Inspire Pack · d23db9a](https://github.com/ltdrdata/ComfyUI-Inspire-Pack/blob/d23db9aa544de9a6d4c609cb7005fa9e0d42031d/inspire/lora_block_weight.py), theo [GPL-3.0](nodes/_inspire_lbw/LICENSE).
+- `LOADER=nunchaku` dùng logic từ [ComfyUI-nunchaku · b600f87](https://github.com/nunchaku-ai/ComfyUI-nunchaku/blob/b600f879a777fdef1466c362e850f7e8c31bf89a/nodes/lora/flux.py), theo [Apache-2.0](nodes/_nunchaku_lora/LICENCE.txt). Tùy chọn này cần thư viện `nunchaku` và đầu vào FLUX đã được nạp dưới dạng Nunchaku. Shank chưa tích hợp node nạp FLUX Nunchaku.

@@ -37,17 +37,13 @@ class ShankImageSaverSimple:
 
     @staticmethod
     def upstream():
-        from nodes import NODE_CLASS_MAPPINGS
+        from ._image_saver.nodes import ImageSaverSimple
 
-        return NODE_CLASS_MAPPINGS.get("Image Saver Simple")
+        return ImageSaverSimple
 
     @classmethod
     def INPUT_TYPES(cls):
         upstream = cls.upstream()
-        if upstream is None:
-            return {"required": {"images": ("IMAGE", {
-                "tooltip": "Cần cài ComfyUI-Image-Saver để hiện các tùy chọn lưu ảnh.",
-            })}}
         return {
             group: {
                 name: (spec[0], {**(spec[1] if len(spec) > 1 else {}), "tooltip": _TOOLTIPS[name]})
@@ -59,8 +55,6 @@ class ShankImageSaverSimple:
 
     def save_images(self, **inputs):
         upstream = self.upstream()
-        if upstream is None:
-            raise RuntimeError("Cần cài ComfyUI-Image-Saver của alexopus để lưu ảnh.")
         return getattr(upstream(), upstream.FUNCTION)(**inputs)
 
 
@@ -98,15 +92,13 @@ class ShankMetadata:
 
     @staticmethod
     def upstream():
-        from nodes import NODE_CLASS_MAPPINGS
+        from ._image_saver.nodes import ImageSaverMetadata
 
-        return NODE_CLASS_MAPPINGS.get("Image Saver Metadata")
+        return ImageSaverMetadata
 
     @classmethod
     def INPUT_TYPES(cls):
         upstream = cls.upstream()
-        if upstream is None:
-            return {"required": {}}
         return {
             group: {
                 name: (spec[0], {**spec[1], "tooltip": _METADATA_TOOLTIPS[name]})
@@ -118,6 +110,4 @@ class ShankMetadata:
 
     def get_metadata(self, **inputs):
         upstream = self.upstream()
-        if upstream is None:
-            raise RuntimeError("Cần cài ComfyUI-Image-Saver của alexopus để tạo metadata.")
         return getattr(upstream(), upstream.FUNCTION)(**inputs)

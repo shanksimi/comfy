@@ -3,41 +3,6 @@ import { api } from "../../scripts/api.js";
 
 app.registerExtension({
   name: "shanksimi.PowerLoraLoader",
-  setup() {
-    const graph = globalThis.LiteGraph;
-    const Original = graph?.registered_node_types?.["Power Lora Loader (rgthree)"];
-    if (!Original) return;
-
-    class ShankPowerLoraLoader extends Original {
-      static comfyClass = "ShankPowerLoraLoader";
-
-      configure(info) {
-        const oldConfig = info.widgets_values?.find(value =>
-          typeof value === "string" && value.startsWith("["));
-        if (oldConfig) {
-          try {
-            const rows = JSON.parse(oldConfig);
-            if (Array.isArray(rows)) {
-              info = {
-                ...info,
-                properties: { ...info.properties, "Show Strengths": "Separate Model & Clip" },
-                widgets_values: rows.filter(row => row?.name).map(row => ({
-                  on: Boolean(row.enabled), lora: row.name,
-                  strength: row.model, strengthTwo: row.clip,
-                })),
-              };
-            }
-          } catch (error) {
-            console.warn("Không thể khôi phục danh sách LoRA cũ", error);
-          }
-        }
-        return super.configure(info);
-      }
-    }
-    ShankPowerLoraLoader.title = "Power Lora Loader (shanksimi)";
-    graph.registerNodeType("ShankPowerLoraLoader", ShankPowerLoraLoader);
-    ShankPowerLoraLoader.category = "loaders";
-  },
   nodeCreated(node) {
     if (node.comfyClass !== "ShankPowerLoraLoader") return;
     const config = node.widgets?.find(widget => widget.name === "loras");
@@ -136,7 +101,18 @@ app.registerExtension({
         },
       });
     };
-    const restore = () => {
+    const restore = savedWidgets => {
+      const migrated = savedWidgets?.filter(value =>
+        value && typeof value === "object" && typeof value.lora === "string");
+      if (migrated?.length) {
+        rows = migrated.map(value => ({
+          enabled: Boolean(value.on), name: value.lora, model: value.strength,
+          clip: value.strengthTwo ?? value.strength,
+        }));
+        update();
+        render();
+        return;
+      }
       try {
         const saved = JSON.parse(config.value);
         rows = Array.isArray(saved) ? saved : [];
@@ -148,7 +124,7 @@ app.registerExtension({
     const configure = node.onConfigure;
     node.onConfigure = function (...args) {
       configure?.apply(this, args);
-      restore();
+      restore(args[0]?.widgets_values);
     };
     const controls = node.addDOMWidget("power_lora_controls", "custom", panel, {
       serialize: false,
