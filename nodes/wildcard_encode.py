@@ -110,15 +110,15 @@ class ShankWildcardEncode:
             file = candidates[0]
             if file not in applied:
                 if loader_name:
-                    custom = nodes.NODE_CLASS_MAPPINGS.get("NunchakuFluxLoraLoader")
-                    if loader_name != "nunchaku" or custom is None:
+                    if loader_name != "nunchaku":
                         raise ValueError(f"LoRA loader unavailable: {loader_name}")
-                    model = custom().load_lora(model, file, model_weight)[0]
+                    from ._nunchaku_lora.loader import load_lora
+
+                    model = load_lora(model, file, model_weight)
                 elif block:
-                    custom = nodes.NODE_CLASS_MAPPINGS.get("LoraLoaderBlockWeight //Inspire")
-                    if custom is None:
-                        raise ValueError("LBW requires ComfyUI-Inspire-Pack")
-                    model, clip, _ = custom().doit(
+                    from ._inspire_lbw.loader import LoraLoaderBlockWeight
+
+                    model, clip, _ = LoraLoaderBlockWeight().doit(
                         model, clip, file, model_weight, clip_weight, False, 0,
                         block_a, block_b, "", block,
                     )

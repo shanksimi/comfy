@@ -1024,10 +1024,9 @@ def process_with_loras(wildcard_opt, model, clip, clip_encoder=None, seed=None, 
 
             if loader is not None:
                 if loader == 'nunchaku':
-                    if 'NunchakuFluxLoraLoader' not in nodes.NODE_CLASS_MAPPINGS:
-                        logging.warning("To use `LOADER=nunchaku`, 'ComfyUI-nunchaku' is required. The LOADER= attribute is being ignored.")
-                    cls = nodes.NODE_CLASS_MAPPINGS['NunchakuFluxLoraLoader']
-                    model = cls().load_lora(model, lora_name, model_weight)[0]
+                    from .._nunchaku_lora.loader import load_lora
+
+                    model = load_lora(model, lora_name, model_weight)
                 else:
                     logging.warning(f"LORA LOADER NOT FOUND: '{loader}'")
             else:
@@ -1035,13 +1034,11 @@ def process_with_loras(wildcard_opt, model, clip, clip_encoder=None, seed=None, 
                     return nodes.LoraLoader().load_lora(model, clip, lora_name, model_weight, clip_weight)
 
                 if lbw is not None:
-                    if 'LoraLoaderBlockWeight //Inspire' not in nodes.NODE_CLASS_MAPPINGS:
-                        logging.warning("'LBW(Lora Block Weight)' is given, but the 'Inspire Pack' is not installed. The LBW= attribute is being ignored.")
-                        model, clip = default_lora()
-                    else:
-                        cls = nodes.NODE_CLASS_MAPPINGS['LoraLoaderBlockWeight //Inspire']
-                        model, clip, _ = cls().doit(model, clip, lora_name, model_weight, clip_weight, False, 0, lbw_a, lbw_b, "", lbw)
+                    from .._inspire_lbw.loader import LoraLoaderBlockWeight
 
+                    model, clip, _ = LoraLoaderBlockWeight().doit(
+                        model, clip, lora_name, model_weight, clip_weight, False, 0, lbw_a, lbw_b, "", lbw,
+                    )
                 else:
                     model, clip = default_lora()
         else:

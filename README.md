@@ -110,11 +110,6 @@ gọi trực tiếp extension khác được ghi rõ bên dưới.
 | [`ShankBasicInfo`](nodes/basic_info.py) | Node nội bộ dựa trên subgraph Basic Info. Tham chiếu [Sampler và Scheduler Selector của Image Saver](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_selectors.py). |
 | [`ShankFastGroupsBypasser`](web/fast_groups_bypasser.js) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/web/comfyui/fast_groups_bypasser.js) |
 
-### Phụ thuộc extension hiện tại
-
-| Node Shank | Extension cần cài để thực thi |
-| --- | --- |
-| Wildcard Encode | [Inspire Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack) khi dùng `LBW`, [ComfyUI-nunchaku](https://github.com/nunchaku-tech/ComfyUI-nunchaku) khi dùng `LOADER=nunchaku`. |
 
 ## License
 
@@ -181,8 +176,8 @@ Khi queue ở chế độ **populate** với prompt tĩnh và seed trực tiếp
 `ShankSeed`, bản workflow gửi đi lưu prompt đã bung ở chế độ **reproduce**.
 Input chỉ có giá trị lúc thực thi được xử lý trong node.
 
-Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với ComfyUI-Inspire-Pack hoặc
-`<lora:tên:0.8:LOADER=nunchaku>` với ComfyUI-nunchaku.
+Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với mã LBW đi kèm hoặc
+`<lora:tên:0.8:LOADER=nunchaku>` với Nunchaku.
 
 ### U-Net Loader with Filename (shanksimi)
 
@@ -354,3 +349,9 @@ các node trong một nhóm của graph hiện tại. Bản tích hợp tham chi
 Nạp weights từ `ComfyUI/models/sams/` qua thư viện `segment-anything`.
 Weights SAM 2 hoặc SAM 2.1 cần thư viện Python `sam2` và hỗ trợ dự đoán
 mask ảnh. SAM 2 video và EfficientSAM hiện chưa được tích hợp.
+
+
+#### LoRA theo block và Nunchaku
+
+- `LBW` dùng mã và preset đi kèm từ [Inspire Pack · d23db9a](https://github.com/ltdrdata/ComfyUI-Inspire-Pack/blob/d23db9aa544de9a6d4c609cb7005fa9e0d42031d/inspire/lora_block_weight.py), theo [GPL-3.0](nodes/_inspire_lbw/LICENSE).
+- `LOADER=nunchaku` dùng logic từ [ComfyUI-nunchaku · b600f87](https://github.com/nunchaku-ai/ComfyUI-nunchaku/blob/b600f879a777fdef1466c362e850f7e8c31bf89a/nodes/lora/flux.py), theo [Apache-2.0](nodes/_nunchaku_lora/LICENCE.txt). Tùy chọn này cần thư viện `nunchaku` và đầu vào FLUX đã được nạp dưới dạng Nunchaku. Shank chưa tích hợp node nạp FLUX Nunchaku.
