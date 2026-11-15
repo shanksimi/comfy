@@ -83,6 +83,9 @@ Sau khi duyệt, mọi người dùng ComfyUI Manager có thể tìm và cài đ
 ## Nguồn tham chiếu của các node
 
 Các liên kết upstream trỏ tới commit đã dùng để đối chiếu khi tích hợp.
+Mục tiêu là mỗi node Shank thực hiện được chức năng của node tham chiếu
+mà chỉ cần cài gói Shank cùng thư viện và weights cần thiết. Các node đang
+gọi trực tiếp extension khác được ghi rõ bên dưới.
 
 | Node | Nguồn tham chiếu |
 | --- | --- |
@@ -104,6 +107,18 @@ Các liên kết upstream trỏ tới commit đã dùng để đối chiếu khi
 | [`ShankHanDetailer`](nodes/face_detailer.py) | [FaceDetailer của Impact Pack · 7ff671a](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6/modules/impact/impact_pack.py#L736), dùng detector bàn tay và prompt mặc định riêng. |
 | [`ShankUltralyticsDetectorProvider`](nodes/ultralytics_detector.py) | [Impact Subpack · 50c7b71](https://github.com/ltdrdata/ComfyUI-Impact-Subpack/blob/50c7b71a6a224734cc9b21963c6d1926816a97f1/modules/subpack_nodes.py) |
 | [`ShankSAMLoader`](nodes/sam_loader.py) | [Impact Pack · 9e2d41d](https://github.com/ltdrdata/ComfyUI-Impact-Pack/blob/9e2d41da75c185bf7638f860d5d004035f378e9b/modules/impact/impact_pack.py) |
+| [`ShankBasicInfo`](nodes/basic_info.py) | Node nội bộ dựa trên subgraph Basic Info. Tham chiếu [Sampler và Scheduler Selector của Image Saver](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_selectors.py). |
+| [`ShankFastGroupsBypasser`](web/fast_groups_bypasser.js) | [rgthree-comfy · bc48c6a](https://github.com/rgthree/rgthree-comfy/blob/bc48c6aaeca87bedbc14245d89f9bc6be37a630e/web/comfyui/fast_groups_bypasser.js) |
+
+### Phụ thuộc extension hiện tại
+
+| Node Shank | Extension cần cài để thực thi |
+| --- | --- |
+| AIO Aux Preprocessor | [ControlNet Aux](https://github.com/Fannovel16/comfyui_controlnet_aux) |
+| Ultimate SD Upscale | [Ultimate SD Upscale](https://github.com/ssitu/ComfyUI_UltimateSDUpscale) |
+| FaceDetailer, HandDetailer, SAM Loader | [Impact Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) |
+| Ultralytics Detector Provider | [Impact Subpack](https://github.com/ltdrdata/ComfyUI-Impact-Subpack) |
+| Wildcard Encode | [Inspire Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack) khi dùng `LBW`, [ComfyUI-nunchaku](https://github.com/nunchaku-tech/ComfyUI-nunchaku) khi dùng `LOADER=nunchaku`. |
 
 ## License
 
@@ -294,10 +309,9 @@ Tham chiếu [mã upstream tại commit `50c7b71`](https://github.com/ltdrdata/C
 
 ### Image Saver Simple (shanksimi)
 
-`ShankImageSaverSimple` gọi node lưu ảnh từ
-[ComfyUI-Image-Saver của alexopus](https://github.com/alexopus/ComfyUI-Image-Saver).
-Cài extension đó để dùng các định dạng lưu ảnh, metadata Civitai/A1111,
-nhúng workflow và xem trước ảnh đã lưu. Mô tả và tooltip có tiếng Việt.
+`ShankImageSaverSimple` dùng mã Image Saver đi kèm gói Shank. Mã nguồn tham chiếu
+và giấy phép MIT nằm trong bảng trên và [nodes/_image_saver/LICENSE](nodes/_image_saver/LICENSE).
+Node hỗ trợ metadata Civitai/A1111, nhúng workflow và xem trước ảnh đã lưu.
 
 ### Image Comparer (shanksimi)
 
@@ -309,7 +323,7 @@ của ComfyUI. Hành vi tham chiếu
 
 ### Power Lora Loader (shanksimi)
 
-Khi cài rgthree-comfy, node dùng trực tiếp giao diện và bộ xử lý Power LoRA Loader của rgthree. Workflow Shank cũ được chuyển sang các dòng LoRA của rgthree khi mở. Khi thiếu rgthree-comfy, node dùng giao diện Shank.
+Node dùng giao diện Shank và bộ nạp LoRA của ComfyUI. rgthree-comfy là nguồn tham chiếu.
 
 Nối MODEL và CLIP nếu có, rồi bấm **Thêm LoRA** để tạo các dòng.
 Mỗi dòng có công tắc bật/tắt và hai ô độ mạnh theo thứ tự MODEL, CLIP.
@@ -332,7 +346,7 @@ trong tên preset, hoặc chọn **Custom** để dùng width và height nhập 
 
 Nối thông số từ Basic Info, seed, tên model và prompt vào
 `ShankMetadata`. Nối output `metadata` vào cổng cùng tên của
-Image Saver Simple. Node dùng bộ tạo metadata của ComfyUI-Image-Saver.
+Image Saver Simple. Node dùng bộ tạo metadata đi kèm gói Shank.
 
 ### Fast Groups Bypasser (shanksimi)
 

@@ -9,17 +9,8 @@ class ShankPowerLoraLoader:
     RETURN_TYPES = ("MODEL", "CLIP")
     OUTPUT_TOOLTIPS = ("MODEL sau khi áp dụng LoRA.", "CLIP sau khi áp dụng LoRA, nếu có đầu vào CLIP.")
 
-    @staticmethod
-    def upstream():
-        from nodes import NODE_CLASS_MAPPINGS
-
-        return NODE_CLASS_MAPPINGS.get("Power Lora Loader (rgthree)")
-
     @classmethod
     def INPUT_TYPES(cls):
-        upstream = cls.upstream()
-        if upstream is not None:
-            return upstream.INPUT_TYPES()
         return {
             "required": {
                 "model": ("MODEL", {"tooltip": "Model cần áp dụng LoRA."}),
@@ -28,13 +19,7 @@ class ShankPowerLoraLoader:
             "optional": {"clip": ("CLIP", {"tooltip": "CLIP cần áp dụng LoRA. Có thể để trống."})},
         }
 
-    def load_loras(self, model=None, loras=None, clip=None, **inputs):
-        if loras is None:
-            upstream = self.upstream()
-            if upstream is None:
-                raise RuntimeError("Cần cài rgthree-comfy để chạy các dòng LoRA của rgthree.")
-            return upstream().load_loras(model=model, clip=clip, **inputs)
-
+    def load_loras(self, model, loras, clip=None):
         import folder_paths
         from nodes import LoraLoader
 
