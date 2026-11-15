@@ -316,9 +316,11 @@ của ComfyUI. Hành vi tham chiếu
 Node dùng giao diện Shank và bộ nạp LoRA của ComfyUI. Workflow đã lưu bằng
 giao diện rgthree và API prompt có các đầu vào `lora_*` vẫn đọc được.
 
-Nối MODEL và CLIP nếu có, rồi bấm **Thêm LoRA** để tạo các dòng.
-Mỗi dòng có công tắc bật/tắt và hai ô độ mạnh theo thứ tự MODEL, CLIP.
-Node áp dụng các dòng đang bật theo thứ tự từ trên xuống.
+Nối MODEL và CLIP nếu có, rồi chọn file ở dòng **Thêm LoRA**. Node tự tạo
+dòng trống phía dưới và mở rộng khi có thêm LoRA. Mỗi dòng dùng một ô strength
+cho cả MODEL và CLIP. Mở menu chuột phải của node để bật **Chỉnh riêng MODEL
+và CLIP**. Các dòng đã lưu hai giá trị khác nhau vẫn hiện cả hai ô. Node áp
+dụng các dòng đang bật theo thứ tự từ trên xuống.
 
 ### Basic Info (shanksimi)
 

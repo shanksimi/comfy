@@ -11,15 +11,9 @@ app.registerExtension({
     config.type = "hidden";
     config.computeSize = () => [0, -4];
     const panel = document.createElement("div");
-    panel.style.cssText = "display:flex;flex-direction:column;gap:6px;box-sizing:border-box;width:100%;height:100%;min-height:0;overflow:hidden";
-    const rowsElement = document.createElement("div");
-    rowsElement.style.cssText = "display:flex;flex-direction:column;gap:4px;min-height:0;overflow:auto";
-    const add = document.createElement("button");
-    add.type = "button";
-    add.style.flexShrink = "0";
-    add.textContent = "+ Thêm LoRA";
-    add.disabled = true;
-    panel.append(rowsElement, add);
+    panel.style.cssText = "display:flex;flex-direction:column;gap:4px;box-sizing:border-box;width:100%";
+    const strengthMode = "Show Strengths";
+    const splitMode = "Separate Model & Clip";
     let choices = [];
     let rows = [];
 
@@ -27,18 +21,23 @@ app.registerExtension({
       config.value = JSON.stringify(rows);
     }
 
-    const panelHeight = () => Math.min(rows.length, 8) * 36 + 36;
+    const panelHeight = () => (rows.length + 1) * 30 + 4;
 
     function render() {
-      rowsElement.replaceChildren();
-      rows.forEach((row, index) => {
+      panel.replaceChildren();
+      const emptyRow = { enabled: true, name: "", model: 1, clip: 1 };
+      [...rows, emptyRow].forEach((row, index) => {
+        const isEmpty = row === emptyRow;
+        const separate = node.properties?.[strengthMode] === splitMode || row.model !== row.clip;
         const line = document.createElement("div");
-        line.style.cssText = "display:grid;grid-template-columns:34px minmax(0,1fr) 56px 56px 26px;gap:4px;align-items:center;min-height:32px;flex-shrink:0";
+        const columns = separate ? "54px 54px" : "64px";
+        line.style.cssText = `display:grid;grid-template-columns:30px minmax(0,1fr) ${columns} 24px;gap:4px;align-items:center;height:26px;flex-shrink:0`;
         const toggle = document.createElement("button");
         toggle.type = "button";
         toggle.setAttribute("role", "switch");
         toggle.setAttribute("aria-label", "Bật/tắt LoRA");
         toggle.title = "Bật/tắt LoRA";
+        toggle.disabled = isEmpty;
         toggle.style.cssText = "position:relative;width:34px;height:20px;padding:0;border:0;border-radius:10px;cursor:pointer";
         const thumb = document.createElement("span");
         thumb.style.cssText = "position:absolute;top:3px;width:14px;height:14px;border-radius:50%;background:white;pointer-events:none";
@@ -57,22 +56,41 @@ app.registerExtension({
         const select = document.createElement("select");
         select.style.cssText = "flex:1;min-width:0";
         select.title = "Chọn file LoRA";
-        select.add(new Option("Chọn LoRA", ""));
+        select.disabled = isEmpty && choices.length === 0;
+        select.add(new Option(isEmpty ? "+ Thêm LoRA" : "Chọn LoRA", ""));
         for (const name of new Set([...choices, row.name].filter(Boolean))) {
           select.add(new Option(name, name));
         }
         select.value = row.name;
-        select.onchange = () => { row.name = select.value; update(); };
+        select.onchange = () => {
+          const name = select.value;
+          if (isEmpty && !name) return;
+          if (isEmpty) {
+            rows.push({ ...row, name });
+          } else if (name) {
+            row.name = name;
+          } else {
+            rows.splice(index, 1);
+          }
+          update();
+          render();
+          panel.children[Math.min(index, rows.length)]?.querySelector("select")?.focus();
+        };
         const strength = (key, label) => {
           const input = document.createElement("input");
           input.type = "number";
           input.step = "0.05";
-          input.value = row[key];
-          input.title = "Độ mạnh " + label;
+          input.value = Number(row[key]).toFixed(2);
+          input.title = label;
+          input.setAttribute("aria-label", label);
+          input.disabled = isEmpty;
           input.style.cssText = "width:100%;min-width:0;box-sizing:border-box";
           input.onchange = () => {
-            if (Number.isFinite(input.valueAsNumber)) row[key] = input.valueAsNumber;
-            input.value = row[key];
+            if (Number.isFinite(input.valueAsNumber)) {
+              row[key] = input.valueAsNumber;
+              if (!separate) row.clip = row.model;
+            }
+            input.value = Number(row[key]).toFixed(2);
             update();
           };
           return input;
@@ -82,32 +100,40 @@ app.registerExtension({
         remove.textContent = "×";
         remove.title = "Xóa dòng LoRA";
         remove.onclick = () => { rows.splice(index, 1); update(); render(); };
-        line.append(toggle, select, strength("model", "MODEL"), strength("clip", "CLIP"), remove);
-        rowsElement.append(line);
+        remove.disabled = isEmpty;
+        remove.style.visibility = isEmpty ? "hidden" : "";
+        line.append(toggle, select, strength("model", separate ? "MODEL strength" : "LoRA strength"));
+        if (separate) line.append(strength("clip", "CLIP strength"));
+        line.append(remove);
+        panel.append(line);
       });
       const minimum = node.computeSize();
       if (node.size[1] < minimum[1]) node.setSize([node.size[0], minimum[1]]);
       node.setDirtyCanvas(true, true);
     }
 
-    add.onclick = event => {
-      new globalThis.LiteGraph.ContextMenu(choices, {
-        event,
-        title: "Chọn LoRA",
-        callback: name => {
-          rows.push({ enabled: true, name, model: 1, clip: 1 });
-          update();
+    const getExtraMenuOptions = node.getExtraMenuOptions;
+    node.getExtraMenuOptions = function (canvas, options) {
+      const result = getExtraMenuOptions?.call(this, canvas, options);
+      const menu = result ?? options;
+      const separate = this.properties?.[strengthMode] === splitMode;
+      menu.push({
+        content: separate ? "Dùng chung strength" : "Chỉnh riêng MODEL và CLIP",
+        callback: () => {
+          (this.properties ??= {})[strengthMode] = separate ? "Single Strength" : splitMode;
           render();
         },
       });
+      return result;
     };
+
     const restore = savedWidgets => {
       const migrated = savedWidgets?.filter(value =>
         value && typeof value === "object" && typeof value.lora === "string");
       if (migrated?.length) {
         rows = migrated.map(value => ({
-          enabled: Boolean(value.on), name: value.lora, model: value.strength,
-          clip: value.strengthTwo ?? value.strength,
+          enabled: Boolean(value.on), name: value.lora, model: value.strength ?? 1,
+          clip: value.strengthTwo ?? value.strength ?? 1,
         }));
         update();
         render();
@@ -115,7 +141,7 @@ app.registerExtension({
       }
       try {
         const saved = JSON.parse(config.value);
-        rows = Array.isArray(saved) ? saved : [];
+        rows = Array.isArray(saved) ? saved.filter(row => row?.name) : [];
       } catch {
         rows = [];
       }
@@ -132,7 +158,7 @@ app.registerExtension({
       getMaxHeight: panelHeight,
     });
     controls.computeSize = width => [width, panelHeight()];
-    node.setSize([Math.max(node.size[0], 380), Math.max(node.size[1], 240)]);
+    node.setSize([Math.max(node.size[0], 290), node.size[1]]);
     restore();
     api.fetchApi("/shanksimi/wildcard-options")
       .then(response => {
@@ -141,10 +167,8 @@ app.registerExtension({
       })
       .then(options => {
         choices = options.loras;
-        add.disabled = choices.length === 0;
-        add.title = choices.length ? "Chọn LoRA để thêm" : "Chưa có file LoRA";
         render();
       })
-      .catch(error => { add.title = "Không tải được danh sách LoRA"; console.warn(error); });
+      .catch(error => { panel.title = "Không tải được danh sách LoRA"; console.warn(error); });
   },
 });
