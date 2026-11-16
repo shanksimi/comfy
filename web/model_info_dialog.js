@@ -7,10 +7,10 @@ const styles = `
 .shank-model-info h3, .shank-model-info h4, .shank-model-info dl { margin:0; }
 .shank-model-info header small { display:block; margin-top:4px; overflow-wrap:anywhere; opacity:.72; }
 .shank-model-info section { padding:18px 20px; }
-.shank-model-info .info-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); gap:20px; }
-.shank-model-info .info-grid.no-preview { grid-template-columns:1fr; }
-.shank-model-info img { width:100%; max-height:460px; object-fit:contain; display:block; background:#111; border-radius:8px; }
-.shank-model-info figure { margin:0; min-width:0; }
+.shank-model-info figure { margin:16px 0 0; min-width:0; }
+.shank-model-info .preview-images { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; }
+.shank-model-info .preview-images img { flex:0 0 100%; width:100%; min-width:0; height:min(460px,65vh); object-fit:contain; display:block; background:#111; border-radius:8px; scroll-snap-align:start; }
+.shank-model-info .preview-images:focus-visible { outline:2px solid #76a9ff; outline-offset:2px; }
 .shank-model-info nav, .shank-model-info .keyword-list { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }
 .shank-model-info table { border-collapse:collapse; width:100%; table-layout:fixed; }
 .shank-model-info th, .shank-model-info td { padding:8px 9px; border-bottom:1px solid var(--border-color,#444); text-align:left; vertical-align:top; overflow-wrap:anywhere; }
@@ -29,7 +29,6 @@ const styles = `
 .shank-model-info button { border:1px solid var(--border-color,#555); border-radius:6px; padding:5px 9px; cursor:pointer; color:inherit; background:var(--comfy-input-bg,#333); }
 .shank-model-info a { display:inline-block; margin-top:12px; color:#8db9ff; }
 .shank-model-info output { font-size:12px; }
-@media (max-width:560px) { .shank-model-info .info-grid { grid-template-columns:1fr; } }
 `;
 
 function element(tag, text, className) {
@@ -87,21 +86,34 @@ function renderKeywords(words) {
 
 function renderPreview(sources, name) {
   const figure = element("figure");
-  const image = element("img");
-  image.alt = "Ảnh mẫu cho " + name;
-  image.referrerPolicy = "no-referrer";
-  const nav = element("nav");
-  const count = element("span");
-  let index = 0;
-  function show(offset = 0) {
-    index = (index + offset + sources.length) % sources.length;
-    image.src = sources[index];
-    count.textContent = `${index + 1} / ${sources.length}`;
+  const gallery = element("div", undefined, "preview-images");
+  gallery.setAttribute("aria-label", "Ảnh mẫu");
+  for (const [index, source] of sources.entries()) {
+    const image = element("img");
+    image.alt = `Ảnh mẫu ${index + 1} cho ${name}`;
+    image.loading = index === 0 ? "eager" : "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.src = source;
+    gallery.append(image);
   }
+  figure.append(gallery);
+  if (sources.length === 1) return figure;
+
+  gallery.tabIndex = 0;
+  const nav = element("nav");
+  const count = element("span", `1 / ${sources.length}`);
+  const currentIndex = () => Math.round(gallery.scrollLeft / gallery.clientWidth) || 0;
+  function show(offset) {
+    const index = (currentIndex() + offset + sources.length) % sources.length;
+    gallery.scrollTo(index * gallery.clientWidth, 0);
+  }
+  gallery.addEventListener("scroll", () => {
+    count.textContent = `${currentIndex() + 1} / ${sources.length}`;
+  });
   nav.append(button("‹", () => show(-1)), count, button("›", () => show(1)));
-  figure.append(image);
-  if (sources.length > 1) figure.append(nav);
-  show();
+  nav.firstChild.setAttribute("aria-label", "Ảnh trước");
+  nav.lastChild.setAttribute("aria-label", "Ảnh sau");
+  figure.append(nav);
   return figure;
 }
 
@@ -114,6 +126,11 @@ function readText(value) {
   markup.innerHTML = value.replace(/<\/?(?:p|div|li|br|h[1-6])\b[^>]*>/gi, "\n");
   markup.content.querySelectorAll("script,style").forEach(node => node.remove());
   return markup.content.textContent.trim();
+}
+
+function editableValue(data, key, name) {
+  const value = data.overrides?.[key] ?? data[key] ?? data.original?.[key];
+  return key === "model" ? value || name : value;
 }
 
 function renderEditor(body, heading, data, name, route) {
@@ -141,7 +158,7 @@ function renderEditor(body, heading, data, name, route) {
     }
     const format = value => Array.isArray(value) ? value.join("\n") :
       type === "textarea" ? readText(value) : String(value ?? "");
-    input.value = format(data[key]);
+    input.value = format(editableValue(data, key, name));
     input.oninput = () => { resets.delete(key); };
     values.set(key, {input, initial: input.value});
     field.append(input);
@@ -149,7 +166,7 @@ function renderEditor(body, heading, data, name, route) {
     if (Object.hasOwn(existing, key)) {
       form.append(button("Dùng lại giá trị gốc – " + label, () => {
         resets.add(key);
-        input.value = format(data.original?.[key]);
+        input.value = format(editableValue(data.original ?? {}, key, name));
       }));
     }
   }
@@ -207,8 +224,6 @@ function renderInfo(body, heading, data, name, route) {
     const query = new URLSearchParams({ category, name });
     sources.unshift(api.apiURL("/shanksimi/model-preview?" + query));
   }
-  const grid = element("div", undefined, sources.length ? "info-grid" : "info-grid no-preview");
-  if (sources.length) grid.append(renderPreview(sources, name));
   const table = element("table");
   table.setAttribute("aria-label", "Thông tin model");
   const rows = element("tbody");
@@ -230,7 +245,7 @@ function renderInfo(body, heading, data, name, route) {
 
   addRow("File", name);
   addRow("SHA-256", data.sha256 || "—");
-  addRow("Tên", data.model || name);
+  addRow("Tên", editableValue(data, "model", name));
   addRow("Loại model", data.model_type || {
     "checkpoint-info": "Checkpoint", "lora-info": "LoRA", "unet-info": "Diffusion model",
   }[route]);
@@ -238,13 +253,14 @@ function renderInfo(body, heading, data, name, route) {
   addRow("Base model", data.base_model);
   addRow("Strength gợi ý", data.preferred_weight);
   if (route === "lora-info") {
-    addRow("Strength Min", String(data.strength_min ?? "—"));
-    addRow("Strength Max", String(data.strength_max ?? "—"));
+    addRow("Strength Min", String(editableValue(data, "strength_min", name) ?? "—"));
+    addRow("Strength Max", String(editableValue(data, "strength_max", name) ?? "—"));
   }
-  addRow("Mô tả", longText(data.description));
-  addRow("Ghi chú / hướng dẫn", longText(data.notes));
-  if (Array.isArray(data.trained_words) && data.trained_words.length) {
-    addRow(route === "lora-info" ? "Trigger words" : "Keywords", renderKeywords(data.trained_words));
+  addRow("Mô tả", longText(editableValue(data, "description", name)));
+  addRow("Ghi chú / hướng dẫn", longText(editableValue(data, "notes", name)));
+  const words = editableValue(data, "trained_words", name);
+  if (Array.isArray(words) && words.length) {
+    addRow(route === "lora-info" ? "Trigger words" : "Keywords", renderKeywords(words));
   }
   if (typeof data.url === "string" && data.url.startsWith("https://civitai.com/models/")) {
     const link = element("a", "Mở trên Civitai");
@@ -254,10 +270,10 @@ function renderInfo(body, heading, data, name, route) {
     addRow("Civitai", link);
   }
   table.append(rows);
-  grid.append(table);
   const actions = element("nav");
   actions.append(button("Sửa thông tin", () => renderEditor(body, heading, data, name, route)));
-  body.replaceChildren(grid, actions);
+  body.replaceChildren(table, actions);
+  if (sources.length) body.append(renderPreview(sources, name));
 }
 
 export async function showModelInfo(name, route, onOpen) {
