@@ -3,6 +3,8 @@ from pathlib import Path
 import re
 from urllib.parse import urlsplit
 
+import requests
+
 from nodes import CheckpointLoaderSimple, UNETLoader
 
 
@@ -40,27 +42,26 @@ class ShankCheckpointLoader(CheckpointLoaderSimple):
 
 def _model_info(path):
     import hashlib
-    import json
-    from urllib.error import URLError
-    from urllib.request import urlopen
 
     digest = hashlib.sha256()
     with open(path, "rb") as model_file:
         for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
             digest.update(chunk)
-    with urlopen("https://civitai.com/api/v1/model-versions/by-hash/" + digest.hexdigest(),
-                 timeout=15) as response:
-        version = json.load(response)
+    with requests.get("https://civitai.com/api/v1/model-versions/by-hash/" + digest.hexdigest(),
+                      timeout=15) as response:
+        response.raise_for_status()
+        version = response.json()
     info = _civitai_info(version)
     info["sha256"] = digest.hexdigest()
     model_id = version.get("modelId")
     if type(model_id) is int and not info["description"]:
         try:
-            with urlopen(f"https://civitai.com/api/v1/models/{model_id}", timeout=8) as response:
-                model = json.load(response)
+            with requests.get(f"https://civitai.com/api/v1/models/{model_id}", timeout=8) as response:
+                response.raise_for_status()
+                model = response.json()
             if isinstance(model, dict):
                 info["description"] = _first_text(model.get("description"))
-        except (URLError, TimeoutError, ValueError):
+        except (requests.RequestException, ValueError):
             pass
     return info
 
@@ -71,7 +72,7 @@ def _first_text(*values):
 
 def _image_urls(images):
     urls = []
-    for image in images if isinstance(images, list) else []:
+    for image in images if isinstance(images, list) else [images]:
         url = image.get("url") if isinstance(image, dict) else image
         if not isinstance(url, str) or (isinstance(image, dict) and image.get("type") == "video"):
             continue
@@ -84,12 +85,22 @@ def _image_urls(images):
     return list(dict.fromkeys(urls))
 
 
+def _metadata_images(data):
+    return list(dict.fromkeys(
+        url
+        for key in ("images", "image", "preview", "previewImage", "preview_image", "imageUrl", "image_url")
+        for url in _image_urls(data.get(key))
+    ))
+
+
 def _local_preview(model_path):
     path = Path(model_path)
-    for extension in (".png", ".jpg", ".jpeg", ".webp"):
-        for candidate in (path.with_suffix(extension), path.with_suffix(".preview" + extension)):
-            if candidate.is_file() and not candidate.is_symlink():
-                return candidate
+    for model in dict.fromkeys((path, path.resolve())):
+        for extension in (".png", ".jpg", ".jpeg", ".webp"):
+            for suffix in (extension, ".preview" + extension):
+                for candidate in (model.with_suffix(suffix), model.with_name(model.name + suffix)):
+                    if candidate.is_file() and not candidate.is_symlink():
+                        return candidate
     return None
 
 
@@ -112,7 +123,7 @@ def _civitai_info(version):
         "notes": _first_text(version.get("notes"), version.get("instructions"), version.get("description")),
         "trained_words": version.get("trainedWords") or [],
         "url": url,
-        "images": _image_urls(version.get("images")),
+        "images": _metadata_images(version),
     }
 
 
@@ -186,7 +197,7 @@ def _read_local_metadata(sidecar):
         *words(info["trained_words"]),
         *words(version.get("triggerWords")),
     ]))
-    info["images"] = list(dict.fromkeys([*_image_urls(data.get("images")), *info["images"]]))
+    info["images"] = list(dict.fromkeys([*_metadata_images(data), *info["images"]]))
     links = data.get("links")
     links = [data.get("url"), data.get("civitaiUrl"), data.get("civitai_url"), *(links if isinstance(links, list) else [])]
     if not info["url"]:
@@ -223,10 +234,13 @@ def _read_info(sidecar, local_sidecars):
                     combined[key] = value
     if combined.get("notes") == combined.get("description"):
         combined.pop("notes", None)
-    if any(value or key in ("strength_min", "strength_max") for key, value in combined.items()):
-        return combined
     data = _read_json(sidecar)
-    return data if data is not None and "trained_words" in data else None
+    cached = data if data is not None and "trained_words" in data else None
+    if any(value or key in ("strength_min", "strength_max") for key, value in combined.items()):
+        if not combined.get("images") and cached:
+            combined["images"] = _metadata_images(cached)
+        return combined
+    return cached
 
 
 def _save_info(sidecar, data):
@@ -294,7 +308,6 @@ def _update_user_info(path, edits, source):
 
 def _register_info_route():
     import asyncio
-    from urllib.error import HTTPError, URLError
 
     import folder_paths
     from aiohttp import web
@@ -312,14 +325,15 @@ def _register_info_route():
                     return
                 data = await asyncio.to_thread(_model_info, path)
                 await asyncio.to_thread(_save_info, sidecar, data)
-        except HTTPError as error:
-            if error.code == 403:
+        except requests.HTTPError as error:
+            status = error.response.status_code
+            if status == 403:
                 failures[path] = "Không đọc được metadata cục bộ phù hợp. Civitai từ chối yêu cầu (HTTP 403)."
-            elif error.code == 404:
+            elif status == 404:
                 failures[path] = "Civitai chưa có phiên bản khớp với file này."
             else:
-                failures[path] = f"Civitai trả lỗi HTTP {error.code}."
-        except (URLError, TimeoutError, ValueError, AttributeError):
+                failures[path] = f"Civitai trả lỗi HTTP {status}."
+        except (requests.RequestException, ValueError, AttributeError):
             failures[path] = "Không đọc được thông tin từ Civitai."
         except OSError:
             failures[path] = "Không đọc được model hoặc không ghi được file thông tin bên cạnh model."
@@ -389,15 +403,16 @@ def _register_info_route():
             local_sidecars = await asyncio.to_thread(_local_sidecars, path)
             saved = await asyncio.to_thread(_read_info, sidecar, local_sidecars)
             overrides = await asyncio.to_thread(_read_json, _user_info_path(path)) or {}
+            has_local_preview = await asyncio.to_thread(_local_preview, path) is not None
         except OSError:
             return web.json_response({"error": "Không đọc được file thông tin model."}, status=500)
-        if saved is not None or overrides:
+        if saved is not None or overrides or has_local_preview:
             source = saved or {}
             return web.json_response({
                 **source,
                 **overrides,
                 "images": _image_urls(source.get("images")),
-                "has_local_preview": await asyncio.to_thread(_local_preview, path) is not None,
+                "has_local_preview": has_local_preview,
                 "overrides": overrides,
                 "original": {key: source[key] for key in _EDITABLE_FIELDS if key in source},
             })
