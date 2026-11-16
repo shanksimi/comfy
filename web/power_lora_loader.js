@@ -1,6 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { showModelInfo } from "./model_info_dialog.js";
+import { openModelPicker } from "./searchable_model_picker.js";
 
 app.registerExtension({
   name: "shanksimi.PowerLoraLoader",
@@ -46,30 +47,23 @@ app.registerExtension({
         const strengthColumns = separate ? "44px 44px" : "52px";
         const columns = isEmpty ? "minmax(0,1fr)" : `17px minmax(0,1fr) 18px ${strengthColumns} 16px`;
         line.style.cssText = `display:grid;grid-template-columns:${columns};gap:4px;align-items:center;height:21px;flex-shrink:0;padding:0 6px;border-radius:11px;background:var(--comfy-input-bg,#202020);color:var(--input-text,#ddd);font:12px sans-serif`;
-        const select = document.createElement("select");
-        select.style.cssText = "width:100%;min-width:0;border:0;background:transparent;color:inherit;font:inherit;text-overflow:ellipsis";
+        const select = document.createElement("button");
+        select.type = "button";
+        select.style.cssText = "width:100%;min-width:0;border:0;background:transparent;color:inherit;font:inherit;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;cursor:pointer;text-align:left;padding:0";
+        select.textContent = isEmpty ? "+ Thêm LoRA" : row.name.split(/[\\/]/).pop();
         select.title = row.name || "Chọn file LoRA";
         select.disabled = isEmpty && choices.length === 0;
-        select.add(new Option(isEmpty ? "+ Thêm LoRA" : "Chọn LoRA", ""));
-        for (const name of new Set([...choices, row.name].filter(Boolean))) {
-          const label = name === row.name ? name.split(/[\\/]/).pop() : name;
-          select.add(new Option(label, name));
-        }
-        select.value = row.name;
-        select.onchange = () => {
-          const name = select.value;
-          if (isEmpty && !name) return;
-          if (isEmpty) {
-            rows.push({ ...row, name });
-          } else if (name) {
-            row.name = name;
-          } else {
-            rows.splice(index, 1);
-          }
-          update();
-          render();
-          panel.children[Math.min(index, rows.length)]?.querySelector("select")?.focus();
-        };
+        select.onclick = () => openModelPicker({
+          title: isEmpty ? "Thêm LoRA" : "Đổi LoRA",
+          choices,
+          current: row.name,
+          onSelect(name) {
+            if (isEmpty) rows.push({ ...row, name });
+            else row.name = name;
+            update();
+            render();
+          },
+        });
         if (isEmpty) {
           line.append(select);
           panel.append(line);
