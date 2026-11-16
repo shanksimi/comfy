@@ -185,6 +185,13 @@ Dùng `<lora:tên:0.8:LBW=PRESET;A=1;B=1>` với mã LBW đi kèm hoặc
 `weight_dtype` và trả thêm `filename` dạng STRING để nối vào node lưu ảnh.
 Hành vi tham chiếu [UNETLoaderWithName của Image Saver](https://github.com/alexopus/ComfyUI-Image-Saver/blob/2cccbf07ca27a86fd2639cf173481f18eab5f4d3/nodes_loaders.py).
 
+### Load Checkpoint with Model Name (shanksimi)
+
+`ShankCheckpointLoader` dùng cùng cơ chế nạp checkpoint của ComfyUI, trả
+`MODEL`, `CLIP`, `VAE` và `model_name` dạng STRING. Nối `model_name` vào
+`modelname` của `ShankMetadata` để lưu tên file checkpoint cùng ảnh. Nút **ⓘ
+Thông tin Civitai** mở bảng Info dùng chung và ưu tiên metadata cạnh checkpoint.
+
 ### AIO Aux Preprocessor (shanksimi)
 
 `ShankAIOAuxPreprocessor` dùng mã annotator và wrapper đi kèm gói Shank.

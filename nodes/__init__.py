@@ -2,7 +2,7 @@ from .load_image_metadata import NODE_CLASS_MAPPINGS as _META_NODE_MAPPINGS, NOD
 from .wildcard_encode import NODE_CLASS_MAPPINGS as _WILDCARD_NODE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as _WILDCARD_DISPLAY_MAPPINGS
 from .seed import NODE_CLASS_MAPPINGS as _SEED_NODE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as _SEED_DISPLAY_MAPPINGS
 from .anima_lllite import NODE_CLASS_MAPPINGS as _LLLITE_NODE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as _LLLITE_DISPLAY_MAPPINGS
-from .unet_loader import ShankUNETLoader
+from .unet_loader import ShankCheckpointLoader, ShankUNETLoader
 from .aio_aux_preprocessor import ShankAIOAuxPreprocessor
 from .reroute_primitive import ShankReroutePrimitive
 from .ultimate_sd_upscale import ShankUltimateSDUpscale
@@ -21,6 +21,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {**_META_DISPLAY_MAPPINGS, **_WILDCARD_DISPLAY_MAPP
 
 NODE_CLASS_MAPPINGS["ShankUNETLoader"] = ShankUNETLoader
 NODE_DISPLAY_NAME_MAPPINGS["ShankUNETLoader"] = "U-Net Loader with Filename (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankCheckpointLoader"] = ShankCheckpointLoader
+NODE_DISPLAY_NAME_MAPPINGS["ShankCheckpointLoader"] = "Load Checkpoint with Model Name (shanksimi)"
 
 NODE_CLASS_MAPPINGS["ShankAIOAuxPreprocessor"] = ShankAIOAuxPreprocessor
 NODE_DISPLAY_NAME_MAPPINGS["ShankAIOAuxPreprocessor"] = "AIO Aux Preprocessor (shanksimi)"

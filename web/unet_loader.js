@@ -5,6 +5,7 @@ const loaderInfo = {
   ShankUNETLoader: ["unet_name", "unet-info"],
   UNETLoader: ["unet_name", "unet-info"],
   CheckpointLoaderSimple: ["ckpt_name", "checkpoint-info"],
+  ShankCheckpointLoader: ["ckpt_name", "checkpoint-info"],
   CheckpointLoader: ["ckpt_name", "checkpoint-info"],
 };
 
