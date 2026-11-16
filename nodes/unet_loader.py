@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from nodes import UNETLoader
 
@@ -32,6 +33,30 @@ def _model_info(path):
     return _civitai_info(version)
 
 
+def _image_urls(images):
+    urls = []
+    for image in images if isinstance(images, list) else []:
+        url = image.get("url") if isinstance(image, dict) else image
+        if not isinstance(url, str) or (isinstance(image, dict) and image.get("type") == "video"):
+            continue
+        try:
+            parsed = urlsplit(url)
+        except ValueError:
+            continue
+        if parsed.scheme == "https" and parsed.hostname in ("image.civitai.com", "image.civitai.red"):
+            urls.append(url)
+    return list(dict.fromkeys(urls))
+
+
+def _local_preview(model_path):
+    path = Path(model_path)
+    for extension in (".png", ".jpg", ".jpeg", ".webp"):
+        for candidate in (path.with_suffix(extension), path.with_suffix(".preview" + extension)):
+            if candidate.is_file() and not candidate.is_symlink():
+                return candidate
+    return None
+
+
 def _civitai_info(version):
     model = version.get("model")
     model_name = model.get("name") if isinstance(model, dict) else model
@@ -46,6 +71,7 @@ def _civitai_info(version):
         "base_model": version.get("baseModel"),
         "trained_words": version.get("trainedWords") or [],
         "url": url,
+        "images": _image_urls(version.get("images")),
     }
 
 
@@ -88,6 +114,7 @@ def _read_local_metadata(sidecar):
         *words(info["trained_words"]),
         *words(version.get("triggerWords")),
     ]))
+    info["images"] = list(dict.fromkeys([*_image_urls(data.get("images")), *info["images"]]))
     links = data.get("links")
     links = [data.get("url"), *(links if isinstance(links, list) else [])]
     if not info["url"]:
@@ -157,14 +184,26 @@ def _register_info_route():
 
     routes = PromptServer.instance.routes
 
+    def model_path_for(category, name):
+        if name in folder_paths.get_filename_list(category):
+            return folder_paths.get_full_path(category, name)
+        return None
+
+    @routes.get("/shanksimi/model-preview")
+    async def preview(request):
+        category = request.query.get("category")
+        if category not in ("loras", "diffusion_models"):
+            return web.Response(status=404)
+        path = model_path_for(category, request.query.get("name", ""))
+        image = await asyncio.to_thread(_local_preview, path) if path else None
+        return web.FileResponse(image) if image else web.Response(status=404)
+
     @routes.get("/shanksimi/unet-info")
     @routes.get("/shanksimi/lora-info")
     async def info(request):
         category = "loras" if request.path.endswith("/lora-info") else "diffusion_models"
         name = request.query.get("name", "")
-        if name not in folder_paths.get_filename_list(category):
-            return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
-        path = folder_paths.get_full_path(category, name)
+        path = model_path_for(category, name)
         if path is None:
             return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
         sidecar = Path(path + ".shank-info.json")
@@ -177,7 +216,11 @@ def _register_info_route():
         except OSError:
             return web.json_response({"error": "Không đọc được file thông tin model."}, status=500)
         if saved is not None:
-            return web.json_response(saved)
+            return web.json_response({
+                **saved,
+                "images": _image_urls(saved.get("images")),
+                "has_local_preview": await asyncio.to_thread(_local_preview, path) is not None,
+            })
         if request.query.get("poll") == "1" and path in failures:
             return web.json_response({"error": failures[path]}, status=502)
         if path not in pending:
