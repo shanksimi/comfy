@@ -79,7 +79,7 @@ def _read_json(sidecar):
     import json
 
     try:
-        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        data = json.loads(sidecar.read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, ValueError):
         return None
     return data if isinstance(data, dict) else None
@@ -91,9 +91,12 @@ def _read_local_metadata(sidecar):
         return None
 
     raw = data.get("raw")
-    version = raw.get("civitai") if isinstance(raw, dict) else data.get("civitai")
-    if not isinstance(version, dict):
-        version = data
+    version = next((candidate for candidate in (
+        raw.get("civitai") if isinstance(raw, dict) else None,
+        data.get("civitai"),
+        data.get("modelVersion"),
+        data.get("metadata"),
+    ) if isinstance(candidate, dict) and candidate), data)
     info = _civitai_info(version)
     info["model"] = info["model"] or data.get("model_name") or data.get("name")
     info["version"] = data.get("version") or data.get("version_name") or (
@@ -121,6 +124,19 @@ def _read_local_metadata(sidecar):
         info["url"] = next((link for link in links if isinstance(link, str)
                             and link.startswith("https://civitai.com/models/")), None)
     return info if any(info.values()) else None
+
+
+def _local_sidecars(model_path):
+    paths = [Path(model_path)]
+    resolved = paths[0].resolve()
+    if resolved != paths[0]:
+        paths.append(resolved)
+    return list(dict.fromkeys(
+        candidate
+        for path in paths
+        for suffix in (".rgthree-info.json", ".metadata.json", ".civitai.info", ".info.json")
+        for candidate in (Path(str(path) + suffix), path.with_suffix(suffix))
+    ))
 
 
 def _read_info(sidecar, local_sidecars):
@@ -171,7 +187,9 @@ def _register_info_route():
                 data = await asyncio.to_thread(_model_info, path)
                 await asyncio.to_thread(_save_info, sidecar, data)
         except HTTPError as error:
-            if error.code == 404:
+            if error.code == 403:
+                failures[path] = "Không đọc được metadata cục bộ phù hợp. Civitai từ chối yêu cầu (HTTP 403)."
+            elif error.code == 404:
                 failures[path] = "Civitai chưa có phiên bản khớp với file này."
             else:
                 failures[path] = f"Civitai trả lỗi HTTP {error.code}."
@@ -207,11 +225,8 @@ def _register_info_route():
         if path is None:
             return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
         sidecar = Path(path + ".shank-info.json")
-        model_path = Path(path)
-        local_sidecars = [model_path.with_suffix(".metadata.json"), Path(path + ".metadata.json")]
-        if category == "loras":
-            local_sidecars.insert(0, Path(path + ".rgthree-info.json"))
         try:
+            local_sidecars = await asyncio.to_thread(_local_sidecars, path)
             saved = await asyncio.to_thread(_read_info, sidecar, local_sidecars)
         except OSError:
             return web.json_response({"error": "Không đọc được file thông tin model."}, status=500)
