@@ -21,6 +21,7 @@ class ShankUNETLoader(UNETLoader):
 def _model_info(path):
     import hashlib
     import json
+    from urllib.error import URLError
     from urllib.request import urlopen
 
     digest = hashlib.sha256()
@@ -30,7 +31,21 @@ def _model_info(path):
     with urlopen("https://civitai.com/api/v1/model-versions/by-hash/" + digest.hexdigest(),
                  timeout=15) as response:
         version = json.load(response)
-    return _civitai_info(version)
+    info = _civitai_info(version)
+    model_id = version.get("modelId")
+    if type(model_id) is int and not info["description"]:
+        try:
+            with urlopen(f"https://civitai.com/api/v1/models/{model_id}", timeout=8) as response:
+                model = json.load(response)
+            if isinstance(model, dict):
+                info["description"] = _first_text(model.get("description"))
+        except (URLError, TimeoutError, ValueError):
+            pass
+    return info
+
+
+def _first_text(*values):
+    return next((value.strip() for value in values if isinstance(value, str) and value.strip()), None)
 
 
 def _image_urls(images):
@@ -63,12 +78,17 @@ def _civitai_info(version):
     model_id = version.get("modelId")
     version_id = version.get("id")
     url = None
-    if type(model_id) is int and type(version_id) is int:
-        url = f"https://civitai.com/models/{model_id}?modelVersionId={version_id}"
+    if type(model_id) is int:
+        url = f"https://civitai.com/models/{model_id}"
+        if type(version_id) is int:
+            url += f"?modelVersionId={version_id}"
     return {
         "model": model_name,
         "version": version.get("name"),
         "base_model": version.get("baseModel"),
+        "model_type": _first_text(model.get("type") if isinstance(model, dict) else None, version.get("type")),
+        "description": _first_text(model.get("description") if isinstance(model, dict) else None),
+        "notes": _first_text(version.get("notes"), version.get("instructions"), version.get("description")),
         "trained_words": version.get("trainedWords") or [],
         "url": url,
         "images": _image_urls(version.get("images")),
@@ -102,9 +122,23 @@ def _read_local_metadata(sidecar):
     info["version"] = data.get("version") or data.get("version_name") or (
         info["version"] if version is not data or isinstance(data.get("model"), dict) or "modelId" in data else None
     )
-    info["base_model"] = data.get("baseModel") or data.get("base_model") or info["base_model"]
+    info["base_model"] = _first_text(data.get("baseModel"), data.get("base_model"), data.get("sd version"), info["base_model"])
+    info["model_type"] = _first_text(data.get("modelType"), data.get("model_type"), data.get("type"), info["model_type"])
+    info["description"] = _first_text(data.get("description"), info["description"])
+    info["notes"] = _first_text(data.get("notes"), data.get("instructions"), data.get("usage"), data.get("userNote"), info["notes"])
+    if info["description"] == info["notes"]:
+        info["notes"] = None
+
+    weight = data.get("preferred weight", data.get("preferred_weight"))
+    if type(weight) in (int, float) or isinstance(weight, str) and weight.strip():
+        info["preferred_weight"] = str(weight)
+
+    for key in ("model", "version"):
+        info[key] = _first_text(info[key])
 
     def words(items):
+        if isinstance(items, str):
+            items = items.split(",")
         for item in items if isinstance(items, list) else []:
             word = item.get("word") if isinstance(item, dict) else item
             if isinstance(word, str) and word.strip():
@@ -114,12 +148,14 @@ def _read_local_metadata(sidecar):
         *words(data.get("trainedWords")),
         *words(data.get("trained_words")),
         *words(data.get("trigger_words")),
+        *words(data.get("activation text")),
+        *words(data.get("activation_text")),
         *words(info["trained_words"]),
         *words(version.get("triggerWords")),
     ]))
     info["images"] = list(dict.fromkeys([*_image_urls(data.get("images")), *info["images"]]))
     links = data.get("links")
-    links = [data.get("url"), *(links if isinstance(links, list) else [])]
+    links = [data.get("url"), data.get("civitaiUrl"), data.get("civitai_url"), *(links if isinstance(links, list) else [])]
     if not info["url"]:
         info["url"] = next((link for link in links if isinstance(link, str)
                             and link.startswith("https://civitai.com/models/")), None)
@@ -134,19 +170,28 @@ def _local_sidecars(model_path):
     return list(dict.fromkeys(
         candidate
         for path in paths
-        for suffix in (".rgthree-info.json", ".metadata.json", ".civitai.info", ".info.json")
+        for suffix in (".rgthree-info.json", ".metadata.json", ".civitai.info", ".info.json", ".json")
         for candidate in (Path(str(path) + suffix), path.with_suffix(suffix))
     ))
 
 
 def _read_info(sidecar, local_sidecars):
+    combined = {}
     for candidate in local_sidecars:
         try:
             info = _read_local_metadata(candidate)
         except OSError:
-            info = None
+            continue
         if info is not None:
-            return info
+            for key, value in info.items():
+                if key in ("trained_words", "images"):
+                    combined[key] = list(dict.fromkeys([*combined.get(key, []), *value]))
+                elif not combined.get(key) and value is not None:
+                    combined[key] = value
+    if combined.get("notes") == combined.get("description"):
+        combined.pop("notes", None)
+    if any(combined.values()):
+        return combined
     data = _read_json(sidecar)
     return data if data is not None and "trained_words" in data else None
 
@@ -201,6 +246,11 @@ def _register_info_route():
             pending.pop(path, None)
 
     routes = PromptServer.instance.routes
+    info_categories = {
+        "/shanksimi/unet-info": "diffusion_models",
+        "/shanksimi/lora-info": "loras",
+        "/shanksimi/checkpoint-info": "checkpoints",
+    }
 
     def model_path_for(category, name):
         if name in folder_paths.get_filename_list(category):
@@ -210,7 +260,7 @@ def _register_info_route():
     @routes.get("/shanksimi/model-preview")
     async def preview(request):
         category = request.query.get("category")
-        if category not in ("loras", "diffusion_models"):
+        if category not in info_categories.values():
             return web.Response(status=404)
         path = model_path_for(category, request.query.get("name", ""))
         image = await asyncio.to_thread(_local_preview, path) if path else None
@@ -218,8 +268,9 @@ def _register_info_route():
 
     @routes.get("/shanksimi/unet-info")
     @routes.get("/shanksimi/lora-info")
+    @routes.get("/shanksimi/checkpoint-info")
     async def info(request):
-        category = "loras" if request.path.endswith("/lora-info") else "diffusion_models"
+        category = info_categories[request.path]
         name = request.query.get("name", "")
         path = model_path_for(category, name)
         if path is None:

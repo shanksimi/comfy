@@ -12,8 +12,14 @@ const styles = `
 .shank-model-info img { width:100%; max-height:460px; object-fit:contain; display:block; background:#111; border-radius:8px; }
 .shank-model-info figure { margin:0; min-width:0; }
 .shank-model-info nav, .shank-model-info .keyword-list { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }
-.shank-model-info dt { font-size:12px; opacity:.72; margin-top:8px; }
-.shank-model-info dd { margin:3px 0 0; overflow-wrap:anywhere; }
+.shank-model-info table { border-collapse:collapse; width:100%; table-layout:fixed; }
+.shank-model-info th, .shank-model-info td { padding:8px 9px; border-bottom:1px solid var(--border-color,#444); text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+.shank-model-info th { width:28%; font-size:12px; font-weight:600; color:var(--descrip-text,#bbb); }
+.shank-model-info td { white-space:pre-wrap; }
+.shank-model-info td .keywords { margin-top:0; }
+.shank-model-info td .keyword-list { margin-top:0; }
+.shank-model-info td a { margin-top:0; }
+.shank-model-info .long-text { max-height:210px; overflow:auto; }
 .shank-model-info .keywords { margin-top:18px; }
 .shank-model-info label { display:inline-flex; gap:5px; align-items:center; overflow-wrap:anywhere; padding:4px 8px; border:1px solid var(--border-color,#555); border-radius:14px; cursor:pointer; }
 .shank-model-info label:has(input:checked) { border-color:#76a9ff; background:#28436f; color:#fff; }
@@ -39,7 +45,6 @@ function button(text, action) {
 
 function renderKeywords(words) {
   const block = element("div", undefined, "keywords");
-  block.append(element("h4", "Trigger words"));
   const list = element("div", undefined, "keyword-list");
   const checks = words.map(word => {
     const label = element("label");
@@ -101,27 +106,56 @@ function renderInfo(body, heading, data, name, route) {
   if (data.model) heading.textContent = data.model;
   const sources = Array.isArray(data.images) ? [...data.images] : [];
   if (data.has_local_preview) {
-    const category = route === "lora-info" ? "loras" : "diffusion_models";
+    const category = { "lora-info": "loras", "checkpoint-info": "checkpoints", "unet-info": "diffusion_models" }[route];
     const query = new URLSearchParams({ category, name });
     sources.unshift(api.apiURL("/shanksimi/model-preview?" + query));
   }
   const grid = element("div", undefined, sources.length ? "info-grid" : "info-grid no-preview");
   if (sources.length) grid.append(renderPreview(sources, name));
-  const detail = element("div");
-  const summary = element("dl");
-  for (const [label, value] of [["Phiên bản", data.version], ["Model nền", data.base_model]]) {
-    if (value) summary.append(element("dt", label), element("dd", value));
+  const table = element("table");
+  table.setAttribute("aria-label", "Thông tin model");
+  const rows = element("tbody");
+  function addRow(label, value) {
+    if (!value) return;
+    const row = element("tr");
+    const nameCell = element("th", label);
+    nameCell.scope = "row";
+    const valueCell = element("td");
+    if (typeof value === "string") valueCell.textContent = value;
+    else valueCell.append(value);
+    row.append(nameCell, valueCell);
+    rows.append(row);
   }
-  detail.append(summary);
-  if (data.trained_words?.length) detail.append(renderKeywords(data.trained_words));
-  if (data.url?.startsWith("https://civitai.com/models/")) {
+  function longText(value) {
+    if (typeof value !== "string" || !value.trim()) return null;
+    const markup = element("template");
+    // Sidecar descriptions may contain HTML. Read only its text; never mount this fragment.
+    markup.innerHTML = value.replace(/<\/?(?:p|div|li|br|h[1-6])\b[^>]*>/gi, "\n");
+    markup.content.querySelectorAll("script,style").forEach(node => node.remove());
+    return element("div", markup.content.textContent.trim(), "long-text");
+  }
+
+  addRow("Tên", data.model || name);
+  addRow("Loại model", data.model_type || {
+    "checkpoint-info": "Checkpoint", "lora-info": "LoRA", "unet-info": "Diffusion model",
+  }[route]);
+  addRow("Phiên bản", data.version);
+  addRow("Base model", data.base_model);
+  addRow("Strength gợi ý", data.preferred_weight);
+  addRow("Mô tả", longText(data.description));
+  addRow("Ghi chú / hướng dẫn", longText(data.notes));
+  if (Array.isArray(data.trained_words) && data.trained_words.length) {
+    addRow(route === "lora-info" ? "Trigger words" : "Keywords", renderKeywords(data.trained_words));
+  }
+  if (typeof data.url === "string" && data.url.startsWith("https://civitai.com/models/")) {
     const link = element("a", "Mở trên Civitai");
     link.href = data.url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    detail.append(link);
+    addRow("Civitai", link);
   }
-  grid.append(detail);
+  table.append(rows);
+  grid.append(table);
   body.replaceChildren(grid);
 }
 
