@@ -3,6 +3,8 @@ from pathlib import Path
 import re
 from urllib.parse import urlsplit
 
+import requests
+
 from nodes import CheckpointLoaderSimple, UNETLoader
 
 
@@ -40,27 +42,26 @@ class ShankCheckpointLoader(CheckpointLoaderSimple):
 
 def _model_info(path):
     import hashlib
-    import json
-    from urllib.error import URLError
-    from urllib.request import urlopen
 
     digest = hashlib.sha256()
     with open(path, "rb") as model_file:
         for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
             digest.update(chunk)
-    with urlopen("https://civitai.com/api/v1/model-versions/by-hash/" + digest.hexdigest(),
-                 timeout=15) as response:
-        version = json.load(response)
+    with requests.get("https://civitai.com/api/v1/model-versions/by-hash/" + digest.hexdigest(),
+                      timeout=15) as response:
+        response.raise_for_status()
+        version = response.json()
     info = _civitai_info(version)
     info["sha256"] = digest.hexdigest()
     model_id = version.get("modelId")
     if type(model_id) is int and not info["description"]:
         try:
-            with urlopen(f"https://civitai.com/api/v1/models/{model_id}", timeout=8) as response:
-                model = json.load(response)
+            with requests.get(f"https://civitai.com/api/v1/models/{model_id}", timeout=8) as response:
+                response.raise_for_status()
+                model = response.json()
             if isinstance(model, dict):
                 info["description"] = _first_text(model.get("description"))
-        except (URLError, TimeoutError, ValueError):
+        except (requests.RequestException, ValueError):
             pass
     return info
 
@@ -307,7 +308,6 @@ def _update_user_info(path, edits, source):
 
 def _register_info_route():
     import asyncio
-    from urllib.error import HTTPError, URLError
 
     import folder_paths
     from aiohttp import web
@@ -325,14 +325,15 @@ def _register_info_route():
                     return
                 data = await asyncio.to_thread(_model_info, path)
                 await asyncio.to_thread(_save_info, sidecar, data)
-        except HTTPError as error:
-            if error.code == 403:
+        except requests.HTTPError as error:
+            status = error.response.status_code
+            if status == 403:
                 failures[path] = "Không đọc được metadata cục bộ phù hợp. Civitai từ chối yêu cầu (HTTP 403)."
-            elif error.code == 404:
+            elif status == 404:
                 failures[path] = "Civitai chưa có phiên bản khớp với file này."
             else:
-                failures[path] = f"Civitai trả lỗi HTTP {error.code}."
-        except (URLError, TimeoutError, ValueError, AttributeError):
+                failures[path] = f"Civitai trả lỗi HTTP {status}."
+        except (requests.RequestException, ValueError, AttributeError):
             failures[path] = "Không đọc được thông tin từ Civitai."
         except OSError:
             failures[path] = "Không đọc được model hoặc không ghi được file thông tin bên cạnh model."
