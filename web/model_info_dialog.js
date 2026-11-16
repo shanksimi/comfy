@@ -11,6 +11,9 @@ const styles = `
 .shank-model-info .info-grid.no-preview { grid-template-columns:1fr; }
 .shank-model-info img { width:100%; max-height:460px; object-fit:contain; display:block; background:#111; border-radius:8px; }
 .shank-model-info figure { margin:0; min-width:0; }
+.shank-model-info .lora-gallery { margin-top:16px; }
+.shank-model-info .lora-gallery-strip { display:flex; align-items:flex-start; overflow-x:auto; scroll-snap-type:x mandatory; overscroll-behavior-x:contain; }
+.shank-model-info .lora-gallery-strip img { flex:0 0 100%; min-width:0; width:100%; height:auto; max-height:none; scroll-snap-align:start; }
 .shank-model-info nav, .shank-model-info .keyword-list { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:8px; }
 .shank-model-info table { border-collapse:collapse; width:100%; table-layout:fixed; }
 .shank-model-info th, .shank-model-info td { padding:8px 9px; border-bottom:1px solid var(--border-color,#444); text-align:left; vertical-align:top; overflow-wrap:anywhere; }
@@ -102,6 +105,46 @@ function renderPreview(sources, name) {
   figure.append(image);
   if (sources.length > 1) figure.append(nav);
   show();
+  return figure;
+}
+
+function renderLoraGallery(sources, name) {
+  const figure = element("figure", undefined, "lora-gallery");
+  const strip = element("div", undefined, "lora-gallery-strip");
+  strip.tabIndex = 0;
+  strip.setAttribute("aria-label", "Ảnh mẫu LoRA, cuộn ngang để xem");
+  for (const [index, source] of sources.entries()) {
+    const image = element("img");
+    image.alt = `Ảnh mẫu ${index + 1} của ${name}`;
+    image.referrerPolicy = "no-referrer";
+    image.loading = index === 0 ? "eager" : "lazy";
+    image.src = source;
+    strip.append(image);
+  }
+  figure.append(strip);
+  if (sources.length > 1) {
+    const nav = element("nav");
+    const index = () => Math.round(strip.scrollLeft / Math.max(1, strip.clientWidth));
+    const move = offset => {
+      const next = Math.max(0, Math.min(sources.length - 1, index() + offset));
+      strip.scrollTo({left: next * strip.clientWidth, behavior: "smooth"});
+    };
+    const previous = button("‹", () => move(-1));
+    previous.setAttribute("aria-label", "Ảnh trước");
+    const next = button("›", () => move(1));
+    next.setAttribute("aria-label", "Ảnh tiếp theo");
+    const count = element("span", `1 / ${sources.length}`);
+    function updatePosition() {
+      const current = index();
+      previous.disabled = current <= 0;
+      next.disabled = current >= sources.length - 1;
+      count.textContent = `${current + 1} / ${sources.length}`;
+    }
+    strip.addEventListener("scroll", updatePosition, {passive: true});
+    updatePosition();
+    nav.append(previous, count, next);
+    figure.append(nav);
+  }
   return figure;
 }
 
@@ -207,8 +250,9 @@ function renderInfo(body, heading, data, name, route) {
     const query = new URLSearchParams({ category, name });
     sources.unshift(api.apiURL("/shanksimi/model-preview?" + query));
   }
-  const grid = element("div", undefined, sources.length ? "info-grid" : "info-grid no-preview");
-  if (sources.length) grid.append(renderPreview(sources, name));
+  const isLora = route === "lora-info";
+  const grid = element("div", undefined, !isLora && sources.length ? "info-grid" : "info-grid no-preview");
+  if (!isLora && sources.length) grid.append(renderPreview(sources, name));
   const table = element("table");
   table.setAttribute("aria-label", "Thông tin model");
   const rows = element("tbody");
@@ -258,6 +302,7 @@ function renderInfo(body, heading, data, name, route) {
   const actions = element("nav");
   actions.append(button("Sửa thông tin", () => renderEditor(body, heading, data, name, route)));
   body.replaceChildren(grid, actions);
+  if (isLora && sources.length) body.append(renderLoraGallery(sources, name));
 }
 
 export async function showModelInfo(name, route, onOpen) {
