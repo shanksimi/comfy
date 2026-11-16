@@ -16,6 +16,9 @@ const styles = `
 .shank-model-info th, .shank-model-info td { padding:8px 9px; border-bottom:1px solid var(--border-color,#444); text-align:left; vertical-align:top; overflow-wrap:anywhere; }
 .shank-model-info th { width:28%; font-size:12px; font-weight:600; color:var(--descrip-text,#bbb); }
 .shank-model-info td { white-space:pre-wrap; }
+.shank-model-info form label { display:block; padding:0; border:0; cursor:default; }
+.shank-model-info form input, .shank-model-info form textarea { display:block; width:100%; box-sizing:border-box; padding:6px; margin:5px 0 10px; color:inherit; background:var(--comfy-input-bg,#333); border:1px solid var(--border-color,#555); border-radius:5px; }
+.shank-model-info form textarea { resize:vertical; }
 .shank-model-info td .keywords { margin-top:0; }
 .shank-model-info td .keyword-list { margin-top:0; }
 .shank-model-info td a { margin-top:0; }
@@ -102,11 +105,105 @@ function renderPreview(sources, name) {
   return figure;
 }
 
+const categories = { "lora-info": "loras", "checkpoint-info": "checkpoints", "unet-info": "diffusion_models" };
+
+function readText(value) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const markup = element("template");
+  // Read only text from the inert fragment; never mount sidecar HTML.
+  markup.innerHTML = value.replace(/<\/?(?:p|div|li|br|h[1-6])\b[^>]*>/gi, "\n");
+  markup.content.querySelectorAll("script,style").forEach(node => node.remove());
+  return markup.content.textContent.trim();
+}
+
+function renderEditor(body, heading, data, name, route) {
+  const form = element("form");
+  const fields = [
+    ["model", "Tên", "text"],
+    ["description", "Mô tả", "textarea"],
+    ["notes", "Ghi chú / hướng dẫn", "textarea"],
+    ["trained_words", "Trigger words / Keywords (mỗi dòng một từ)", "textarea"],
+  ];
+  if (route === "lora-info") {
+    fields.push(["strength_min", "Strength Min", "number"], ["strength_max", "Strength Max", "number"]);
+  }
+  const values = new Map();
+  const resets = new Set();
+  const existing = data.overrides ?? {};
+  for (const [key, label, type] of fields) {
+    const field = element("label", label);
+    const input = element(type === "textarea" ? "textarea" : "input");
+    if (type === "number") {
+      input.type = "number";
+      input.step = "any";
+      input.min = "-100";
+      input.max = "100";
+    }
+    const format = value => Array.isArray(value) ? value.join("\n") :
+      type === "textarea" ? readText(value) : String(value ?? "");
+    input.value = format(data[key]);
+    input.oninput = () => { resets.delete(key); };
+    values.set(key, {input, initial: input.value});
+    field.append(input);
+    form.append(field);
+    if (Object.hasOwn(existing, key)) {
+      form.append(button("Dùng lại giá trị gốc – " + label, () => {
+        resets.add(key);
+        input.value = format(data.original?.[key]);
+      }));
+    }
+  }
+  const save = element("button", "Lưu");
+  save.type = "submit";
+  const status = element("output");
+  status.setAttribute("aria-live", "polite");
+  const actions = element("nav");
+  const cancel = button("Hủy", () => renderInfo(body, heading, data, name, route));
+  actions.append(save, cancel, status);
+  form.append(actions);
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const edits = {};
+    for (const [key, {input, initial}] of values) {
+      if (resets.has(key)) edits[key] = null;
+      else if (input.value !== initial) {
+        if (key === "trained_words") edits[key] = input.value.split(/\r?\n/);
+        else if (input.type === "number") edits[key] = input.value === "" ? null : input.valueAsNumber;
+        else edits[key] = input.value;
+      }
+    }
+    if (!Object.keys(edits).length) {
+      renderInfo(body, heading, data, name, route);
+      return;
+    }
+    save.disabled = cancel.disabled = true;
+    try {
+      const response = await api.fetchApi("/shanksimi/model-info-edits", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({category: categories[route], name, edits}),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.overrides) {
+        throw new Error(result?.error || `Không lưu được thông tin (HTTP ${response.status}).`);
+      }
+      const updated = {...data};
+      for (const key of Object.keys(existing)) delete updated[key];
+      Object.assign(updated, data.original, result.overrides, {overrides: result.overrides});
+      renderInfo(body, heading, updated, name, route);
+    } catch (error) {
+      status.textContent = error.message;
+      save.disabled = cancel.disabled = false;
+    }
+  };
+  body.replaceChildren(form);
+}
+
 function renderInfo(body, heading, data, name, route) {
-  if (data.model) heading.textContent = data.model;
+  heading.textContent = data.model || "Thông tin model";
   const sources = Array.isArray(data.images) ? [...data.images] : [];
   if (data.has_local_preview) {
-    const category = { "lora-info": "loras", "checkpoint-info": "checkpoints", "unet-info": "diffusion_models" }[route];
+    const category = categories[route];
     const query = new URLSearchParams({ category, name });
     sources.unshift(api.apiURL("/shanksimi/model-preview?" + query));
   }
@@ -127,14 +224,12 @@ function renderInfo(body, heading, data, name, route) {
     rows.append(row);
   }
   function longText(value) {
-    if (typeof value !== "string" || !value.trim()) return null;
-    const markup = element("template");
-    // Sidecar descriptions may contain HTML. Read only its text; never mount this fragment.
-    markup.innerHTML = value.replace(/<\/?(?:p|div|li|br|h[1-6])\b[^>]*>/gi, "\n");
-    markup.content.querySelectorAll("script,style").forEach(node => node.remove());
-    return element("div", markup.content.textContent.trim(), "long-text");
+    const text = readText(value);
+    return text ? element("div", text, "long-text") : null;
   }
 
+  addRow("File", name);
+  addRow("SHA-256", data.sha256 || "—");
   addRow("Tên", data.model || name);
   addRow("Loại model", data.model_type || {
     "checkpoint-info": "Checkpoint", "lora-info": "LoRA", "unet-info": "Diffusion model",
@@ -142,6 +237,10 @@ function renderInfo(body, heading, data, name, route) {
   addRow("Phiên bản", data.version);
   addRow("Base model", data.base_model);
   addRow("Strength gợi ý", data.preferred_weight);
+  if (route === "lora-info") {
+    addRow("Strength Min", String(data.strength_min ?? "—"));
+    addRow("Strength Max", String(data.strength_max ?? "—"));
+  }
   addRow("Mô tả", longText(data.description));
   addRow("Ghi chú / hướng dẫn", longText(data.notes));
   if (Array.isArray(data.trained_words) && data.trained_words.length) {
@@ -156,7 +255,9 @@ function renderInfo(body, heading, data, name, route) {
   }
   table.append(rows);
   grid.append(table);
-  body.replaceChildren(grid);
+  const actions = element("nav");
+  actions.append(button("Sửa thông tin", () => renderEditor(body, heading, data, name, route)));
+  body.replaceChildren(grid, actions);
 }
 
 export async function showModelInfo(name, route, onOpen) {
@@ -198,6 +299,9 @@ export async function showModelInfo(name, route, onOpen) {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   } catch (error) {
-    if (dialog.open) body.textContent = error.message || "Không tải được thông tin.";
+    if (dialog.open) {
+      renderInfo(body, heading, {}, name, route);
+      body.append(element("p", error.message || "Không tải được thông tin."));
+    }
   }
 }

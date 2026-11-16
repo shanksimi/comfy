@@ -1,4 +1,6 @@
+import math
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 
 from nodes import UNETLoader
@@ -32,6 +34,7 @@ def _model_info(path):
                  timeout=15) as response:
         version = json.load(response)
     info = _civitai_info(version)
+    info["sha256"] = digest.hexdigest()
     model_id = version.get("modelId")
     if type(model_id) is int and not info["description"]:
         try:
@@ -118,6 +121,18 @@ def _read_local_metadata(sidecar):
         data.get("metadata"),
     ) if isinstance(candidate, dict) and candidate), data)
     info = _civitai_info(version)
+    sha256 = _first_text(data.get("sha256"), version.get("_sha256"), version.get("sha256"))
+    if sha256 and re.fullmatch(r"[a-fA-F0-9]{64}", sha256):
+        info["sha256"] = sha256.lower()
+    for key, legacy_key in (("strength_min", "strengthMin"), ("strength_max", "strengthMax")):
+        value = data.get(key, data.get(legacy_key))
+        if value is not None:
+            try:
+                strength = float(value)
+            except (ValueError, TypeError, OverflowError):
+                continue
+            if math.isfinite(strength):
+                info[key] = strength
     info["model"] = info["model"] or data.get("model_name") or data.get("name")
     info["version"] = data.get("version") or data.get("version_name") or (
         info["version"] if version is not data or isinstance(data.get("model"), dict) or "modelId" in data else None
@@ -159,7 +174,7 @@ def _read_local_metadata(sidecar):
     if not info["url"]:
         info["url"] = next((link for link in links if isinstance(link, str)
                             and link.startswith("https://civitai.com/models/")), None)
-    return info if any(info.values()) else None
+    return info if any(value or key in ("strength_min", "strength_max") for key, value in info.items()) else None
 
 
 def _local_sidecars(model_path):
@@ -186,11 +201,11 @@ def _read_info(sidecar, local_sidecars):
             for key, value in info.items():
                 if key in ("trained_words", "images"):
                     combined[key] = list(dict.fromkeys([*combined.get(key, []), *value]))
-                elif not combined.get(key) and value is not None:
+                elif combined.get(key) is None and value is not None:
                     combined[key] = value
     if combined.get("notes") == combined.get("description"):
         combined.pop("notes", None)
-    if any(combined.values()):
+    if any(value or key in ("strength_min", "strength_max") for key, value in combined.items()):
         return combined
     data = _read_json(sidecar)
     return data if data is not None and "trained_words" in data else None
@@ -212,6 +227,53 @@ def _save_info(sidecar, data):
             os.unlink(temporary)
 
 
+_EDITABLE_FIELDS = {"model", "description", "notes", "trained_words", "strength_min", "strength_max"}
+
+
+def _parse_info_edits(edits):
+    if not isinstance(edits, dict) or edits.keys() - _EDITABLE_FIELDS:
+        raise ValueError("Các trường chỉnh sửa không hợp lệ.")
+    result = {}
+    for key, value in edits.items():
+        if value is None:
+            result[key] = None
+        elif key == "trained_words":
+            if not isinstance(value, list) or len(value) > 300 or any(
+                not isinstance(word, str) or len(word) > 300 for word in value
+            ):
+                raise ValueError("Danh sách trigger words không hợp lệ.")
+            result[key] = list(dict.fromkeys(word.strip() for word in value if word.strip()))
+        elif key in ("strength_min", "strength_max"):
+            if type(value) not in (int, float) or not -100 <= value <= 100:
+                raise ValueError("Strength Min/Max phải nằm trong khoảng −100 đến 100.")
+            result[key] = value
+        else:
+            if not isinstance(value, str) or len(value) > (300 if key == "model" else 20000):
+                raise ValueError("Tên, mô tả hoặc ghi chú quá dài hoặc không hợp lệ.")
+            result[key] = value.strip()
+    return result
+
+
+def _user_info_path(model_path):
+    return Path(str(Path(model_path).resolve()) + ".shank-user-info.json")
+
+
+def _update_user_info(path, edits, source):
+    sidecar = _user_info_path(path)
+    saved = _read_json(sidecar) or {}
+    for key, value in edits.items():
+        if value is None:
+            saved.pop(key, None)
+        else:
+            saved[key] = value
+    effective = {**source, **saved}
+    minimum, maximum = effective.get("strength_min"), effective.get("strength_max")
+    if minimum is not None and maximum is not None and minimum > maximum:
+        raise ValueError("Strength Min phải nhỏ hơn hoặc bằng Strength Max.")
+    _save_info(sidecar, saved)
+    return saved
+
+
 def _register_info_route():
     import asyncio
     from urllib.error import HTTPError, URLError
@@ -223,6 +285,7 @@ def _register_info_route():
     pending = {}
     failures = {}
     worker = asyncio.Semaphore(1)
+    edit_lock = asyncio.Lock()
 
     async def lookup(path, sidecar, local_sidecars):
         try:
@@ -266,6 +329,34 @@ def _register_info_route():
         image = await asyncio.to_thread(_local_preview, path) if path else None
         return web.FileResponse(image) if image else web.Response(status=404)
 
+    @routes.post("/shanksimi/model-info-edits")
+    async def save_edits(request):
+        if request.content_type != "application/json":
+            return web.json_response({"error": "Dữ liệu phải ở dạng JSON."}, status=415)
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Dữ liệu chỉnh sửa không hợp lệ.")
+            category = payload.get("category")
+            name = payload.get("name")
+            if category not in info_categories.values() or not isinstance(name, str):
+                raise ValueError("Model cần chỉnh sửa không hợp lệ.")
+            edits = _parse_info_edits(payload.get("edits"))
+        except (ValueError, TypeError) as error:
+            return web.json_response({"error": str(error)}, status=400)
+        path = model_path_for(category, name)
+        if path is None:
+            return web.json_response({"error": "Không tìm thấy file model đã chọn."}, status=404)
+        try:
+            async with edit_lock:
+                source = await asyncio.to_thread(_read_info, Path(path + ".shank-info.json"), _local_sidecars(path))
+                overrides = await asyncio.to_thread(_update_user_info, path, edits, source or {})
+        except ValueError as error:
+            return web.json_response({"error": str(error)}, status=400)
+        except OSError:
+            return web.json_response({"error": "Không ghi được file thông tin cạnh model."}, status=500)
+        return web.json_response({"overrides": overrides})
+
     @routes.get("/shanksimi/unet-info")
     @routes.get("/shanksimi/lora-info")
     @routes.get("/shanksimi/checkpoint-info")
@@ -279,13 +370,18 @@ def _register_info_route():
         try:
             local_sidecars = await asyncio.to_thread(_local_sidecars, path)
             saved = await asyncio.to_thread(_read_info, sidecar, local_sidecars)
+            overrides = await asyncio.to_thread(_read_json, _user_info_path(path)) or {}
         except OSError:
             return web.json_response({"error": "Không đọc được file thông tin model."}, status=500)
-        if saved is not None:
+        if saved is not None or overrides:
+            source = saved or {}
             return web.json_response({
-                **saved,
-                "images": _image_urls(saved.get("images")),
+                **source,
+                **overrides,
+                "images": _image_urls(source.get("images")),
                 "has_local_preview": await asyncio.to_thread(_local_preview, path) is not None,
+                "overrides": overrides,
+                "original": {key: source[key] for key in _EDITABLE_FIELDS if key in source},
             })
         if request.query.get("poll") == "1" and path in failures:
             return web.json_response({"error": failures[path]}, status=502)
