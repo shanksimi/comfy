@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from urllib.parse import urlsplit
 
-from nodes import UNETLoader
+from nodes import CheckpointLoaderSimple, UNETLoader
 
 
 class ShankUNETLoader(UNETLoader):
@@ -18,6 +18,24 @@ class ShankUNETLoader(UNETLoader):
     def load_unet(self, unet_name, weight_dtype):
         (model,) = super().load_unet(unet_name, weight_dtype)
         return model, unet_name
+
+
+class ShankCheckpointLoader(CheckpointLoaderSimple):
+    """Load a checkpoint and expose its selected filename."""
+
+    RETURN_TYPES = ("MODEL", "CLIP", "VAE", "STRING")
+    RETURN_NAMES = ("MODEL", "CLIP", "VAE", "model_name")
+    OUTPUT_TOOLTIPS = (
+        "Model dùng để khử nhiễu latent.",
+        "Text encoder dùng để mã hóa prompt.",
+        "VAE từ checkpoint.",
+        "Tên file checkpoint, gồm cả thư mục con, để nối vào Metadata.",
+    )
+    DESCRIPTION = "Nạp checkpoint và trả tên file checkpoint cho Metadata."
+
+    def load_checkpoint(self, ckpt_name):
+        model, clip, vae = super().load_checkpoint(ckpt_name)
+        return model, clip, vae, ckpt_name
 
 
 def _model_info(path):
