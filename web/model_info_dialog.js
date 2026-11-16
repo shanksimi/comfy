@@ -181,8 +181,13 @@ export async function showModelInfo(name, route, onOpen) {
     const query = new URLSearchParams({ name });
     while (dialog.open) {
       const response = await api.fetchApi(`/shanksimi/${route}?${query}`, { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || response.statusText);
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error || `Không tải được thông tin model (HTTP ${response.status}).`);
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("Máy chủ ComfyUI trả dữ liệu thông tin model không hợp lệ.");
+      }
       if (!dialog.open) return;
       if (response.status !== 202) {
         renderInfo(body, heading, data, name, route);

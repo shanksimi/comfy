@@ -270,7 +270,7 @@ def _register_info_route():
     @routes.get("/shanksimi/lora-info")
     @routes.get("/shanksimi/checkpoint-info")
     async def info(request):
-        category = info_categories[request.path]
+        category = info_categories[request.path.removeprefix("/api")]
         name = request.query.get("name", "")
         path = model_path_for(category, name)
         if path is None:
