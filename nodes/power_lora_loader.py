@@ -27,12 +27,21 @@ def _resolve_rgthree_name(name, available):
     return next((path for path in available if name in path), None)
 
 
+def _patch_count(patcher):
+    return sum(len(entries) for entries in patcher.patches.values())
+
+
 class ShankPowerLoraLoader:
     CATEGORY = "loaders"
     DESCRIPTION = "Áp dụng nhiều LoRA theo thứ tự. Có thể bật/tắt và chỉnh độ mạnh MODEL, CLIP cho từng LoRA."
     FUNCTION = "load_loras"
-    RETURN_TYPES = ("MODEL", "CLIP")
-    OUTPUT_TOOLTIPS = ("MODEL sau khi áp dụng LoRA.", "CLIP sau khi áp dụng LoRA, nếu có đầu vào CLIP.")
+    RETURN_TYPES = ("MODEL", "CLIP", "STRING")
+    RETURN_NAMES = ("MODEL", "CLIP", "enabled_loras")
+    OUTPUT_TOOLTIPS = (
+        "MODEL sau khi áp dụng LoRA.",
+        "CLIP sau khi áp dụng LoRA, nếu có đầu vào CLIP.",
+        "Tên file và số patch MODEL, CLIP mới có strength khác 0 cho từng LoRA được load.",
+    )
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -52,6 +61,19 @@ class ShankPowerLoraLoader:
 
         available = folder_paths.get_filename_list("loras")
         loader = LoraLoader()
+        reports = []
+
+        def apply_lora(name, model_strength, clip_strength):
+            nonlocal model, clip
+            count_model = model is not None and model_strength != 0
+            count_clip = clip is not None and clip_strength != 0
+            before_model = _patch_count(model) if count_model else 0
+            before_clip = _patch_count(clip.patcher) if count_clip else 0
+            model, clip = loader.load_lora(model, clip, name, model_strength, clip_strength)
+            model_patches = _patch_count(model) - before_model if count_model else 0
+            clip_patches = _patch_count(clip.patcher) - before_clip if count_clip else 0
+            reports.append(f"{name} · MODEL: {model_patches} patch · CLIP: {clip_patches} patch")
+
         if loras is None:
             for key, row in inputs.items():
                 if not key.lower().startswith("lora_") or not isinstance(row, dict):
@@ -69,8 +91,8 @@ class ShankPowerLoraLoader:
                 elif clip_strength is None:
                     clip_strength = model_strength
                 if model is not None and (model_strength or clip_strength):
-                    model, clip = loader.load_lora(model, clip, name, model_strength, clip_strength)
-            return model, clip
+                    apply_lora(name, model_strength, clip_strength)
+            return model, clip, "\n".join(reports)
 
         rows = json.loads(loras)
         if not isinstance(rows, list):
@@ -88,5 +110,5 @@ class ShankPowerLoraLoader:
                 continue
             if name not in available:
                 raise ValueError(f"Không tìm thấy LoRA: {name}")
-            model, clip = loader.load_lora(model, clip, name, model_strength, clip_strength)
-        return model, clip
+            apply_lora(name, model_strength, clip_strength)
+        return model, clip, "\n".join(reports)
