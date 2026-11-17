@@ -22,8 +22,8 @@ import math
 class ShankWildcardEncode:
     DESCRIPTION = (
         "Mở rộng wildcard trong prompt, áp dụng LoRA được chỉ định và mã hóa "
-        "prompt thành conditioning. Dùng BREAK để mã hóa từng đoạn riêng "
-        "rồi nối conditioning."
+        "prompt thành conditioning. BREAK tách các đoạn để mã hóa riêng. "
+        "Với Anima, các đoạn được nối trước khi mã hóa để giữ đầy đủ token T5."
     )
 
     @classmethod
@@ -129,13 +129,24 @@ class ShankWildcardEncode:
 
         prompt = re.sub(r"<lora:([^<>]+)>", apply_lora, populated)
         parts = [part.strip() for part in re.split(r"\bBREAK\b", prompt) if part.strip()]
+        conditioning = self._encode_parts(clip, parts, nodes)
+        return {"ui": {"text": [populated], "mode": [mode]},
+                "result": (model, clip, conditioning, populated)}
+
+    @staticmethod
+    def _encode_parts(clip, parts, nodes):
+        if len(parts) > 1 and clip is not None:
+            tokens = clip.tokenize(", ".join(parts))
+            if "qwen3_06b" in tokens and "t5xxl" in tokens:
+                # ConditioningConcat only preserves the first segment's T5 metadata.
+                return clip.encode_from_tokens_scheduled(tokens)
+
         encoder = nodes.CLIPTextEncode()
         conditioning = []
         for part in parts or [""]:
             current = encoder.encode(clip, part)[0]
             conditioning = nodes.ConditioningConcat().concat(conditioning, current)[0] if conditioning else current
-        return {"ui": {"text": [populated], "mode": [mode]},
-                "result": (model, clip, conditioning, populated)}
+        return conditioning
 
     @staticmethod
     def wildcard_entries():
