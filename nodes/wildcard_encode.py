@@ -19,11 +19,76 @@ import random
 import math
 
 
+_ANIMA_BREAK = "shanksimi.anima_break"
+
+
+def _prepare_anima_break(model, encoded):
+    import torch
+    from comfy.patcher_extension import WrappersMP
+
+    conditioning = []
+    for group in zip(*encoded, strict=True):
+        embeddings = [embedding for embedding, _ in group]
+        options = group[0][1].copy()
+        options.pop("t5xxl_ids")
+        options.pop("t5xxl_weights", None)
+        options.pop("attention_mask", None)
+        options[_ANIMA_BREAK] = tuple(
+            (embedding.shape[1], metadata["t5xxl_ids"], metadata.get("t5xxl_weights"))
+            for embedding, metadata in group
+        )
+        conditioning.append([torch.cat(embeddings, dim=1), options])
+
+    # The adapter belongs to the diffusion model and needs its loaded weights.
+    wrapper_type = WrappersMP.PREPARE_SAMPLING
+    if not model.get_wrappers(wrapper_type, _ANIMA_BREAK):
+        model = model.clone()
+        model.add_wrapper_with_key(wrapper_type, _ANIMA_BREAK, _adapt_anima_break)
+    return model, conditioning
+
+
+def _adapt_anima_break(executor, model, noise_shape, conds, *args, **kwargs):
+    import torch
+    from comfy import model_management
+
+    inner_model, loaded_conds, loaded_models = executor(model, noise_shape, conds, *args, **kwargs)
+    types = {}
+    device = model.load_device
+    with torch.inference_mode(), model_management.cuda_device_context(device):
+        for kind, entries in loaded_conds.items():
+            types[kind] = [
+                _adapt_anima_entry(entry, inner_model, device) if _ANIMA_BREAK in entry else entry
+                for entry in entries
+            ]
+    return inner_model, types, loaded_models
+
+
+def _adapt_anima_entry(entry, model, device):
+    import torch
+
+    updated = entry.copy()
+    sections = updated.pop(_ANIMA_BREAK)
+    dtype = model.get_dtype_inference()
+    lengths = [length for length, _, _ in sections]
+    embeddings = updated["cross_attn"].to(device=device, dtype=dtype).split(lengths, dim=1)
+    adapted = []
+    for embedding, (_, ids, weights) in zip(embeddings, sections, strict=True):
+        ids = ids.to(device=device).unsqueeze(0)
+        if weights is not None:
+            weights = weights.to(embedding).reshape(1, -1, 1)
+        context = model.diffusion_model.preprocess_text_embeds(embedding, ids, t5xxl_weights=weights)
+        # ComfyUI pads each adapter output to 512. Pad only once after joining.
+        adapted.append(context[:, :ids.shape[1]])
+    context = torch.cat(adapted, dim=1)
+    updated["cross_attn"] = torch.nn.functional.pad(context, (0, 0, 0, max(0, 512 - context.shape[1])))
+    return updated
+
+
 class ShankWildcardEncode:
     DESCRIPTION = (
         "Mở rộng wildcard trong prompt, áp dụng LoRA được chỉ định và mã hóa "
-        "prompt thành conditioning. Dùng BREAK để mã hóa từng đoạn riêng "
-        "rồi nối conditioning."
+        "prompt thành conditioning. BREAK tách các đoạn để mã hóa riêng. "
+        "Với Anima, nối đầu ra sau khi xử lý Qwen và T5 của từng đoạn."
     )
 
     @classmethod
@@ -52,7 +117,7 @@ class ShankWildcardEncode:
     RETURN_TYPES = ("MODEL", "CLIP", "CONDITIONING", "STRING")
     RETURN_NAMES = ("model", "clip", "conditioning", "populated_text")
     OUTPUT_TOOLTIPS = (
-        "Model sau khi áp dụng LoRA từ prompt, nếu có.",
+        "Model sau khi áp dụng LoRA. Nối đầu ra này vào sampler khi dùng BREAK với Anima.",
         "CLIP sau khi áp dụng LoRA từ prompt, nếu có.",
         "Conditioning đã mã hóa để nối vào sampler.",
         "Prompt đã mở rộng wildcard, gồm cả các thẻ LoRA đã chọn.",
@@ -129,13 +194,25 @@ class ShankWildcardEncode:
 
         prompt = re.sub(r"<lora:([^<>]+)>", apply_lora, populated)
         parts = [part.strip() for part in re.split(r"\bBREAK\b", prompt) if part.strip()]
-        encoder = nodes.CLIPTextEncode()
-        conditioning = []
-        for part in parts or [""]:
-            current = encoder.encode(clip, part)[0]
-            conditioning = nodes.ConditioningConcat().concat(conditioning, current)[0] if conditioning else current
+        model, conditioning = self._encode_parts(model, clip, parts, nodes)
         return {"ui": {"text": [populated], "mode": [mode]},
                 "result": (model, clip, conditioning, populated)}
+
+    @staticmethod
+    def _encode_parts(model, clip, parts, nodes):
+        encoder = nodes.CLIPTextEncode()
+        conditioning = encoder.encode(clip, parts[0] if parts else "")[0]
+        if len(parts) < 2:
+            return model, conditioning
+
+        if conditioning and "t5xxl_ids" in conditioning[0][1]:
+            encoded = [conditioning, *(encoder.encode(clip, part)[0] for part in parts[1:])]
+            return _prepare_anima_break(model, encoded)
+
+        for part in parts[1:]:
+            current = encoder.encode(clip, part)[0]
+            conditioning = nodes.ConditioningConcat().concat(conditioning, current)[0]
+        return model, conditioning
 
     @staticmethod
     def wildcard_entries():
