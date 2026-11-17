@@ -167,9 +167,13 @@ app.registerExtension({
       }
       render();
     };
+    const reportOutput = node.outputs?.find(output => output.name === "enabled_loras");
     const configure = node.onConfigure;
     node.onConfigure = function (...args) {
       configure?.apply(this, args);
+      if (reportOutput && !this.outputs.some(output => output.name === reportOutput.name)) {
+        this.addOutput(reportOutput.name, reportOutput.type);
+      }
       restore(args[0]?.widgets_values);
     };
     const controls = node.addDOMWidget("power_lora_controls", "custom", panel, {
