@@ -50,7 +50,7 @@ app.registerExtension({
         const select = document.createElement("button");
         select.type = "button";
         select.style.cssText = "width:100%;min-width:0;border:0;background:transparent;color:inherit;font:inherit;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;cursor:pointer;text-align:left;padding:0";
-        select.textContent = isEmpty ? "+ Thêm LoRA" : row.name.split(/[\\/]/).pop();
+        select.textContent = isEmpty ? "+ Thêm LoRA" : row.name.split(/[\\/]/).pop().replace(/\.(?:safetensors|sft|ckpt|pt|pth|bin|gguf)$/i, "");
         select.title = row.name || "Chọn file LoRA";
         select.disabled = isEmpty && choices.length === 0;
         select.onclick = () => openModelPicker({
@@ -167,9 +167,13 @@ app.registerExtension({
       }
       render();
     };
+    const reportOutput = node.outputs?.find(output => output.name === "enabled_loras");
     const configure = node.onConfigure;
     node.onConfigure = function (...args) {
       configure?.apply(this, args);
+      if (reportOutput && !this.outputs.some(output => output.name === reportOutput.name)) {
+        this.addOutput(reportOutput.name, reportOutput.type);
+      }
       restore(args[0]?.widgets_values);
     };
     const controls = node.addDOMWidget("power_lora_controls", "custom", panel, {

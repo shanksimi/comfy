@@ -1,3 +1,7 @@
+from dataclasses import replace
+import json
+
+
 _TOOLTIPS = {
     "images": "Ảnh hoặc batch ảnh cần lưu.",
     "filename": (
@@ -99,7 +103,7 @@ class ShankMetadata:
     @classmethod
     def INPUT_TYPES(cls):
         upstream = cls.upstream()
-        return {
+        inputs = {
             group: {
                 name: (spec[0], {**spec[1], "tooltip": _METADATA_TOOLTIPS[name]})
                 if name in _METADATA_TOOLTIPS else spec
@@ -107,7 +111,23 @@ class ShankMetadata:
             }
             for group, inputs in upstream.INPUT_TYPES().items()
         }
+        optional = inputs.setdefault("optional", {})
+        for name in ("positive", "negative"):
+            kind, options = optional[name]
+            optional[name] = (kind, {**options, "default": "", "multiline": False})
+        optional["loras"] = ("STRING", {
+            "forceInput": True,
+            "tooltip": "Nối enabled_loras từ Power LoRA để lưu tên LoRA và số patch MODEL / CLIP vào tham số ảnh.",
+        })
+        return inputs
 
-    def get_metadata(self, **inputs):
+    def get_metadata(self, loras="", positive="", negative="", **inputs):
         upstream = self.upstream()
-        return getattr(upstream(), upstream.FUNCTION)(**inputs)
+        metadata, hashes, params = getattr(upstream(), upstream.FUNCTION)(
+            positive=positive, negative=negative, **inputs,
+        )
+        report = " | ".join(line.strip() for line in loras.splitlines() if line.strip())
+        if report:
+            params += ", Enabled LoRAs: " + json.dumps(report, ensure_ascii=False)
+            metadata = replace(metadata, a111_params=params)
+        return metadata, hashes, params
