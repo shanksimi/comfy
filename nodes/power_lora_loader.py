@@ -40,7 +40,7 @@ class ShankPowerLoraLoader:
     OUTPUT_TOOLTIPS = (
         "MODEL sau khi áp dụng LoRA.",
         "CLIP sau khi áp dụng LoRA, nếu có đầu vào CLIP.",
-        "Tên file và số patch MODEL, CLIP mới có strength khác 0 cho từng LoRA được load.",
+        "Tên file, strength và số patch MODEL / CLIP của từng LoRA được áp dụng.",
     )
 
     @classmethod
@@ -72,7 +72,10 @@ class ShankPowerLoraLoader:
             model, clip = loader.load_lora(model, clip, name, model_strength, clip_strength)
             model_patches = _patch_count(model) - before_model if count_model else 0
             clip_patches = _patch_count(clip.patcher) - before_clip if count_clip else 0
-            reports.append(f"{name} · MODEL: {model_patches} patch · CLIP: {clip_patches} patch")
+            reports.append(
+                f"{name} · MODEL: {model_patches} patch (strength: {model_strength})"
+                f" · CLIP: {clip_patches} patch (strength: {clip_strength})"
+            )
 
         if loras is None:
             for key, row in inputs.items():
