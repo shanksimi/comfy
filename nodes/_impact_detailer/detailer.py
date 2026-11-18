@@ -17,6 +17,25 @@ def _detailer_cycle_images(image, detailer_hook, cycle):
     return None
 
 
+def _paste_detail_images(image, enhanced_image, mask, crop_region, detailer_hook, images_by_cycle, cycle_images):
+    targets = [image] if images_by_cycle is None else images_by_cycle
+    patches = cycle_images if cycle_images else [enhanced_image] * len(targets)
+    for i, (target, patch) in enumerate(zip(targets, patches)):
+        utils.tensor_paste(target, patch, (crop_region[0], crop_region[1]), mask)
+        if detailer_hook is not None:
+            if images_by_cycle is not None:
+                detailer_hook.set_steps((i, len(targets)))
+            target = detailer_hook.post_paste(target)
+        targets[i] = target
+    return targets[-1]
+
+
+
+def _sorted_by_crop_size(outputs):
+    # Sampled-size crops keep the order of their crops, so the per-region output lists stay paired.
+    return [image for _, image in sorted(outputs, key=lambda output: output[0], reverse=True)]
+
+
 class DetailerForEach:
     @classmethod
     def INPUT_TYPES(s):
