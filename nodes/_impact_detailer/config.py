@@ -30,13 +30,14 @@ def read_config():
     try:
         config = configparser.ConfigParser()
         config.read(config_path)
-        default_conf = config['default']
+        default_conf = config['default'] if config.has_section('default') else config[config.default_section]
 
         # Strip quotes from custom_wildcards path if present
         custom_wildcards_path = default_conf.get('custom_wildcards', '').strip('\'"')
 
         if not os.path.exists(custom_wildcards_path):
-            logging.warning(f"[Impact Pack] custom_wildcards path not found: {custom_wildcards_path}. Using default path.")
+            if custom_wildcards_path:
+                logging.warning(f"[Impact Pack] custom_wildcards path not found: {custom_wildcards_path}. Using default path.")
             custom_wildcards_path = os.path.join(pack_root, "custom_wildcards")
 
         default_conf['custom_wildcards'] = custom_wildcards_path
