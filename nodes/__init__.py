@@ -15,6 +15,7 @@ from .image_comparer import ShankImageComparer
 from .power_lora_loader import ShankPowerLoraLoader
 from .basic_info import ShankBasicInfo
 from .simple_math import ShankSimpleMath
+from .model_patch_loader import ShankModelPatchLoader
 
 NODE_CLASS_MAPPINGS = {**_META_NODE_MAPPINGS, **_WILDCARD_NODE_MAPPINGS, **_SEED_NODE_MAPPINGS, **_LLLITE_NODE_MAPPINGS}
 NODE_DISPLAY_NAME_MAPPINGS = {**_META_DISPLAY_MAPPINGS, **_WILDCARD_DISPLAY_MAPPINGS, **_SEED_DISPLAY_MAPPINGS, **_LLLITE_DISPLAY_MAPPINGS}
@@ -24,6 +25,9 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankUNETLoader"] = "U-Net Loader with Filename (sha
 
 NODE_CLASS_MAPPINGS["ShankCheckpointLoader"] = ShankCheckpointLoader
 NODE_DISPLAY_NAME_MAPPINGS["ShankCheckpointLoader"] = "Load Checkpoint with Model Name (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankModelPatchLoader"] = ShankModelPatchLoader
+NODE_DISPLAY_NAME_MAPPINGS["ShankModelPatchLoader"] = "Load Model Patch (shanksimi)"
 
 NODE_CLASS_MAPPINGS["ShankAIOAuxPreprocessor"] = ShankAIOAuxPreprocessor
 NODE_DISPLAY_NAME_MAPPINGS["ShankAIOAuxPreprocessor"] = "AIO Aux Preprocessor (shanksimi)"
