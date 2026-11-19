@@ -647,17 +647,19 @@ app.registerExtension({
           editBtn.title = "View full size / draw mask";
           editBtn.onclick = (ev) => { ev.stopPropagation(); openMaskEditor(f); };
           const deleteBtn = el("button", {
-            position: "absolute", top: "8px", left: "36px", width: "22px", height: "22px",
-            padding: "0", borderRadius: "4px", border: "0", background: "#8a2929", color: "#fff",
+            position: "absolute", top: "8px", left: viewOnly ? "8px" : "36px",
+            minWidth: "22px", height: "22px", padding: "0 5px", borderRadius: "4px",
+            border: "0", background: "#8a2929", color: "#fff",
             cursor: "pointer",
-          }, "×");
+          }, viewOnly ? "Xóa" : "×");
           deleteBtn.type = "button";
-          deleteBtn.title = "Delete image";
-          deleteBtn.setAttribute("aria-label", "Delete " + f.name);
-          deleteBtn.onclick = async (ev) => {
-            ev.stopPropagation();
-            if (!window.confirm("Permanently delete " + f.name + "?")) return;
-            deleteBtn.disabled = true;
+          deleteBtn.title = "Xóa ảnh";
+          deleteBtn.setAttribute("aria-label", "Xóa " + f.name);
+          let deleting = false;
+          async function deleteImage(button, onDeleted) {
+            if (deleting || !window.confirm("Xóa vĩnh viễn ảnh “" + f.name + "”?")) return;
+            deleting = true;
+            button.disabled = true;
             try {
               const response = await api.fetchApi("/load_image_metadata/delete", {
                 method: "POST",
@@ -670,13 +672,21 @@ app.registerExtension({
               const entries = getEntries();
               if (entries.includes(f.value)) setEntries(entries.filter((entry) => entry !== f.value));
               refreshMarks();
+              onDeleted?.();
               if (overlay.isConnected && version === loadVersion) await load(d.path);
             } catch (error) {
-              if (overlay.isConnected) window.alert("Could not delete image: " + error.message);
-              deleteBtn.disabled = false;
+              if (overlay.isConnected) window.alert("Không xóa được ảnh: " + error.message);
+            } finally {
+              deleting = false;
+              button.disabled = false;
             }
+          }
+          deleteBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            return deleteImage(deleteBtn);
           };
-          if (!viewOnly) t.append(editBtn, deleteBtn);
+          if (!viewOnly) t.append(editBtn);
+          t.append(deleteBtn);
           const metadataBadges = el("div", {
             position: "absolute", bottom: "22px", right: "8px", display: "flex", gap: "4px",
           });
@@ -744,7 +754,12 @@ app.registerExtension({
               const download = el("a", { ...baseBtn, display: "inline-block", marginRight: "6px" }, "Tải ảnh gốc");
               download.href = api.apiURL(fullUrl + query);
               download.download = f.name;
-              dialog.append(full, download, closeImage);
+              const deleteFull = mkBtn("Xóa ảnh");
+              deleteFull.style.background = "#8a2929";
+              deleteFull.style.color = "#fff";
+              deleteFull.style.marginRight = "6px";
+              deleteFull.onclick = () => deleteImage(deleteFull, () => dialog.close());
+              dialog.append(full, download, deleteFull, closeImage);
               overlay.append(dialog);
               dialog.showModal();
               return;
