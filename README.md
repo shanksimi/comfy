@@ -155,6 +155,19 @@ tên hiển thị. Khi upstream cập nhật, đối chiếu `nodes.py` và
 chọn weights, rồi nối output `MODEL` tới sampler. Với weights inpaint, nối
 thêm mask theo hướng dẫn upstream.
 
+### SeedVR2 Video Upscaler
+
+Bản tích hợp [SeedVR2 VideoUpscaler của numz và AInVFX](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler/commit/4490bd1f482e026674543386bb2a4d176da245b9)
+giữ ID `SeedVR2LoadDiTModel`, `SeedVR2LoadVAEModel`, `SeedVR2VideoUpscaler`
+và `SeedVR2TorchCompileSettings` để mở lại workflow đã tạo với extension gốc.
+Mã upstream, cấu hình và embedding đi kèm nằm trong
+[`nodes/_seedvr2/`](nodes/_seedvr2/) theo [Apache-2.0](nodes/_seedvr2/LICENSE).
+
+Sau khi cập nhật repo, cài lại `requirements.txt` và khởi động lại ComfyUI.
+Node tải model đã chọn khi chạy lần đầu, hoặc dùng model có sẵn trong
+`ComfyUI/models/SEEDVR2/`. Workflow Colab T4 dùng
+`seedvr2_ema_3b-Q4_K_M.gguf` và `ema_vae_fp16.safetensors`.
+
 ### Nguồn tham chiếu cho ShankWildcardEncode
 
 Cú pháp wildcard tham chiếu [ComfyUI-Impact-Pack, commit `7ff671a`](https://github.com/ltdrdata/ComfyUI-Impact-Pack/tree/7ff671ad5f407c3eba907a9b83b6b8c9d13f64b6).

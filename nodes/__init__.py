@@ -1,3 +1,5 @@
+import logging
+
 from .load_image_metadata import NODE_CLASS_MAPPINGS as _META_NODE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as _META_DISPLAY_MAPPINGS
 from .wildcard_encode import NODE_CLASS_MAPPINGS as _WILDCARD_NODE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as _WILDCARD_DISPLAY_MAPPINGS
 from .seed import NODE_CLASS_MAPPINGS as _SEED_NODE_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as _SEED_DISPLAY_MAPPINGS
@@ -70,5 +72,15 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankMetadata"] = "Metadata"
 
 NODE_CLASS_MAPPINGS["ShankSAMLoader"] = ShankSAMLoader
 NODE_DISPLAY_NAME_MAPPINGS["ShankSAMLoader"] = "SAM Loader (shanksimi)"
+
+try:
+    from . import _seedvr2
+except Exception:
+    logging.getLogger(__name__).exception(
+        "SeedVR2 nodes failed to load. Check ComfyUI and this pack's requirements."
+    )
+else:
+    NODE_CLASS_MAPPINGS.update(_seedvr2.NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(_seedvr2.NODE_DISPLAY_NAME_MAPPINGS)
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

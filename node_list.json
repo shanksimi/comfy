@@ -26,6 +26,38 @@
     "license": "MIT",
     "tags": ["seed", "utils", "vietnamese"]
   },
+  "SeedVR2LoadDiTModel": {
+    "display_name": "SeedVR2 (Down)Load DiT Model",
+    "description": "Nạp model SeedVR2 và cấu hình offload.",
+    "authors": ["numz", "AInVFX"],
+    "website": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
+    "license": "Apache-2.0",
+    "tags": ["seedvr2", "video", "upscale"]
+  },
+  "SeedVR2LoadVAEModel": {
+    "display_name": "SeedVR2 (Down)Load VAE Model",
+    "description": "Nạp VAE và cấu hình tiling cho SeedVR2.",
+    "authors": ["numz", "AInVFX"],
+    "website": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
+    "license": "Apache-2.0",
+    "tags": ["seedvr2", "video", "upscale"]
+  },
+  "SeedVR2VideoUpscaler": {
+    "display_name": "SeedVR2 Video Upscaler (v2.5.24)",
+    "description": "Phục hồi và tăng độ phân giải ảnh hoặc video bằng SeedVR2.",
+    "authors": ["numz", "AInVFX"],
+    "website": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
+    "license": "Apache-2.0",
+    "tags": ["seedvr2", "video", "upscale"]
+  },
+  "SeedVR2TorchCompileSettings": {
+    "display_name": "SeedVR2 Torch Compile Settings",
+    "description": "Cấu hình torch.compile tùy chọn cho SeedVR2.",
+    "authors": ["numz", "AInVFX"],
+    "website": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
+    "license": "Apache-2.0",
+    "tags": ["seedvr2", "video", "upscale"]
+  },
   "ShankAnimaLLLiteApply": {
     "display_name": "Apply Anima ControlNet-LLLite (shanksimi)",
     "description": "Áp dụng ControlNet-LLLite lên model Anima bằng ảnh điều kiện và mask tùy chọn.",
