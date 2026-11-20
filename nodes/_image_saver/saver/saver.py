@@ -10,10 +10,9 @@ import piexif.helper
 def save_image(image: Image, filepath: str, extension: str, quality_jpeg_or_webp: int, lossless_webp: bool, optimize_png: bool, a111_params: str, prompt: dict[str, Any] | None, extra_pnginfo: dict[str, Any] | None, embed_workflow: bool) -> None:
     if extension == 'png':
         metadata = PngInfo()
-        if a111_params:
-            metadata.add_text("parameters", a111_params)
-
         if embed_workflow:
+            if a111_params:
+                metadata.add_text("parameters", a111_params)
             if extra_pnginfo is not None:
                 for k, v in extra_pnginfo.items():
                     metadata.add_text(k, json.dumps(v, separators=(',', ':')))
@@ -27,16 +26,20 @@ def save_image(image: Image, filepath: str, extension: str, quality_jpeg_or_webp
 
         if extension != 'avif':
             image.save(filepath, optimize=True, quality=quality_jpeg_or_webp, lossless=lossless_webp)
+        elif not embed_workflow:
+            image.save(filepath, format='AVIF', quality=quality_jpeg_or_webp)
+
+        if not embed_workflow:
+            return
 
         # Native example adding workflow to exif:
         # https://github.com/comfyanonymous/ComfyUI/blob/095610717000bffd477a7e72988d1fb2299afacb/comfy_extras/nodes_images.py#L113
         pnginfo_json = {}
         prompt_json = {}
-        if embed_workflow:
-            if extra_pnginfo is not None:
-                pnginfo_json = {piexif.ImageIFD.Make - i: f"{k}:{json.dumps(v, separators=(',', ':'))}" for i, (k, v) in enumerate(extra_pnginfo.items())}
-            if prompt is not None:
-                prompt_json = {piexif.ImageIFD.Model: f"prompt:{json.dumps(prompt, separators=(',', ':'))}"}
+        if extra_pnginfo is not None:
+            pnginfo_json = {piexif.ImageIFD.Make - i: f"{k}:{json.dumps(v, separators=(',', ':'))}" for i, (k, v) in enumerate(extra_pnginfo.items())}
+        if prompt is not None:
+            prompt_json = {piexif.ImageIFD.Model: f"prompt:{json.dumps(prompt, separators=(',', ':'))}"}
 
         def get_exif_bytes() -> bytes:
             exif_dict = ({
@@ -59,7 +62,7 @@ def save_image(image: Image, filepath: str, extension: str, quality_jpeg_or_webp
         # JPEG format limits the EXIF bytes to a maximum of 65535 bytes
         if extension == "jpg" or extension == "jpeg":
             MAX_EXIF_SIZE = 65535
-            if len(exif_bytes) > MAX_EXIF_SIZE and embed_workflow:
+            if len(exif_bytes) > MAX_EXIF_SIZE:
                 print("ComfyUI-Image-Saver: Error: Workflow is too large, removing client request prompt.")
                 prompt_json = {}
                 exif_bytes = get_exif_bytes()

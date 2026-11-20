@@ -17,10 +17,9 @@ _TOOLTIPS = {
     "quality_jpeg_or_webp": "Chất lượng nén JPEG, WebP hoặc AVIF.",
     "optimize_png": "Tối ưu dung lượng PNG. Có thể làm chậm quá trình lưu.",
     "embed_workflow": (
-        "Nhúng workflow vào file ảnh. PNG hỗ trợ ổn định. WebP và JPEG đang thử nghiệm. "
-        "JPEG yêu cầu metadata nhỏ hơn 65.535 byte."
+        "Lưu workflow và metadata tạo ảnh. Tắt để chỉ lưu ảnh, kể cả khi đã bật lưu JSON riêng."
     ),
-    "save_workflow_as_json": "Lưu thêm workflow thành file JSON riêng.",
+    "save_workflow_as_json": "Lưu thêm workflow thành file JSON riêng khi bật embed_workflow.",
     "metadata": "Metadata tạo ảnh cần nhúng. Nối từ node chuẩn bị metadata của Image Saver.",
     "counter": "Giá trị bộ đếm dùng cho biến %counter.",
     "time_format": "Định dạng thời gian dùng trong mẫu tên file.",

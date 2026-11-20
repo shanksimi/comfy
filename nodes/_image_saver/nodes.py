@@ -306,8 +306,8 @@ class ImageSaverSimple:
                 "lossless_webp":         ("BOOLEAN",  {"default": True,                                             "tooltip": "if True, saved WEBP files will be lossless"}),
                 "quality_jpeg_or_webp":  ("INT",      {"default": 100, "min": 1, "max": 100,                        "tooltip": "quality setting of JPEG/WEBP/AVIF"}),
                 "optimize_png":          ("BOOLEAN",  {"default": False,                                            "tooltip": "if True, saved PNG files will be optimized (can reduce file size but is slower)"}),
-                "embed_workflow":        ("BOOLEAN",  {"default": True,                                             "tooltip": "if True, embeds the workflow in the saved image files.\nStable for PNG, experimental for WEBP.\nJPEG experimental and only if metadata size is below 65535 bytes"}),
-                "save_workflow_as_json": ("BOOLEAN",  {"default": False,                                            "tooltip": "if True, also saves the workflow as a separate JSON file"}),
+                "embed_workflow":        ("BOOLEAN",  {"default": True,                                             "tooltip": "Save workflow and generation metadata. When off, saves the image only."}),
+                "save_workflow_as_json": ("BOOLEAN",  {"default": False,                                            "tooltip": "Also save a separate workflow JSON when embed_workflow is on."}),
             },
             "optional": {
                 "metadata":              ("METADATA", {"default": None,                                             "tooltip": "metadata to embed in the image"}),
@@ -395,8 +395,8 @@ class ImageSaver:
                 "denoise":               ("FLOAT",   {"default": 1.0, "min": 0.0, "max": 1.0,                      "tooltip": "denoise value"}),
                 "clip_skip":             ("INT",     {"default": 0, "min": -24, "max": 24,                         "tooltip": "skip last CLIP layers (positive or negative value, 0 for no skip)"}),
                 "time_format":           ("STRING",  {"default": "%Y-%m-%d-%H%M%S", "multiline": False,            "tooltip": "timestamp format"}),
-                "save_workflow_as_json": ("BOOLEAN", {"default": False,                                            "tooltip": "if True, also saves the workflow as a separate JSON file"}),
-                "embed_workflow":        ("BOOLEAN", {"default": True,                                             "tooltip": "if True, embeds the workflow in the saved image files.\nStable for PNG, experimental for WEBP.\nJPEG experimental and only if metadata size is below 65535 bytes"}),
+                "save_workflow_as_json": ("BOOLEAN", {"default": False,                                            "tooltip": "Also save a separate workflow JSON when embed_workflow is on."}),
+                "embed_workflow":        ("BOOLEAN", {"default": True,                                             "tooltip": "Save workflow and generation metadata. When off, saves the image only."}),
                 "additional_hashes":     ("STRING",  {"default": "", "multiline": False,                           "tooltip": "hashes separated by commas, optionally with names. 'Name:HASH' (e.g., 'MyLoRA:FF735FF83F98')\nWith download_civitai_data set to true, weights can be added as well. (e.g., 'HASH:Weight', 'Name:HASH:Weight')"}),
                 "download_civitai_data": ("BOOLEAN", {"default": True,                                             "tooltip": "Download and cache data from civitai.com to save correct metadata. Allows LoRA weights to be saved to the metadata."}),
                 "easy_remix":            ("BOOLEAN", {"default": True,                                             "tooltip": "Strip LoRAs and simplify 'embedding:path' from the prompt to make the Remix option on civitai.com more seamless."}),
@@ -520,7 +520,7 @@ class ImageSaver:
 
             save_image(img, filepath, extension, quality_jpeg_or_webp, lossless_webp, optimize_png, metadata.a111_params, prompt, extra_pnginfo, embed_workflow)
 
-            if save_workflow_as_json:
+            if embed_workflow and save_workflow_as_json:
                 save_json(extra_pnginfo, resolve_within_output(path, current_filename_prefix))
 
             # Relative to the caller's path, for the UI preview
