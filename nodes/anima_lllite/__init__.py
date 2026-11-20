@@ -140,6 +140,9 @@ class ShankAnimaLLLiteApply:
                 # Required when the loaded weights are 4ch (inpaint). White = inpaint area,
                 # black = keep. Mismatch with the weights' cond_in_channels is reported below.
                 "mask": ("MASK",),
+                "lllite_report": (LLLITE_REPORT, {
+                    "tooltip": "Nối report từ node LLLite trước đó trong cùng chuỗi MODEL.",
+                }),
             },
         }
 
@@ -149,7 +152,7 @@ class ShankAnimaLLLiteApply:
     CATEGORY = "loaders"
 
     def apply(self, model, lllite_name, image, strength, start_percent, end_percent,
-              preserve_wrapper=True, mask=None):
+              preserve_wrapper=True, mask=None, lllite_report=None):
         from comfy.patcher_extension import WrappersMP
 
         weights_path = folder_paths.get_full_path("controlnet", lllite_name)
@@ -214,6 +217,7 @@ class ShankAnimaLLLiteApply:
             start_percent=start_percent,
             end_percent=end_percent,
             preserve_wrapper=preserve_wrapper,
+            previous=lllite_report,
         )
         for module in lllite.lllite_modules:
             module.diagnostic_counts = counts
