@@ -72,5 +72,61 @@
       "controlnet",
       "lllite"
     ]
+  },
+  "VHS_LoadVideoFFmpeg": {
+    "display_name": "Load Video FFmpeg (Upload)",
+    "description": "Chọn hoặc tải lên video, xuất các khung hình, âm thanh và thông tin video.",
+    "authors": [
+      "Kosinkadink",
+      "shanksimi"
+    ],
+    "website": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+    "license": "GPL-3.0-only",
+    "tags": [
+      "video",
+      "upscale"
+    ]
+  },
+  "VHS_VideoInfoLoaded": {
+    "display_name": "Video Info (Loaded)",
+    "description": "Đọc FPS, kích thước, thời lượng và số khung hình đã nạp.",
+    "authors": [
+      "Kosinkadink",
+      "shanksimi"
+    ],
+    "website": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+    "license": "GPL-3.0-only",
+    "tags": [
+      "video",
+      "upscale"
+    ]
+  },
+  "VHS_BatchManager": {
+    "display_name": "Meta Batch Manager",
+    "description": "Chia video thành nhiều lô khung hình.",
+    "authors": [
+      "Kosinkadink",
+      "shanksimi"
+    ],
+    "website": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+    "license": "GPL-3.0-only",
+    "tags": [
+      "video",
+      "upscale"
+    ]
+  },
+  "VHS_VideoCombine": {
+    "display_name": "Video Combine",
+    "description": "Ghép khung hình với âm thanh, xuất video và duyệt video đã lưu.",
+    "authors": [
+      "Kosinkadink",
+      "shanksimi"
+    ],
+    "website": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+    "license": "GPL-3.0-only",
+    "tags": [
+      "video",
+      "upscale"
+    ]
   }
 }

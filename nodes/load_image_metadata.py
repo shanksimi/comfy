@@ -33,6 +33,7 @@ import os
 import re
 import stat
 import struct
+import subprocess
 import tempfile
 import zipfile
 import zlib
@@ -53,6 +54,7 @@ DRIVE_FOLDER_DEFAULT = "/content/drive/MyDrive/SD-Data/Export/ComfyUI/%Y-%m-%d"
 DRIVE_UTC_OFFSET_DEFAULT = 7  # Colab chay gio UTC; 7 = gio Viet Nam, dat 0 neu khong can
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff", ".avif"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".mkv", ".gif", ".webp", ".avi", ".m4v"}
 
 # "Key: value, Key2: value2" with optional "quoted, values" (same idea as A1111)
 _RE_PARAM = re.compile(r'\s*([\w ]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)')
@@ -424,11 +426,20 @@ let lastTab = "input_folder";
 app.registerExtension({
   name: "ShankImageLoad.Browser",
   nodeCreated(node) {
-    const isSaver = node.comfyClass === "ShankImageSaverSimple";
-    if (!isSaver && node.comfyClass !== "ShankImageLoad") return;
+    const isVideoLoader = node.comfyClass === "VHS_LoadVideoFFmpeg";
+    const isVideoSaver = node.comfyClass === "VHS_VideoCombine";
+    const isVideo = isVideoLoader || isVideoSaver;
+    const isSaver = isVideoSaver || node.comfyClass === "ShankImageSaverSimple";
+    if (!isSaver && !isVideoLoader && node.comfyClass !== "ShankImageLoad") return;
+    const kind = isVideo ? "video" : "image";
+    const mediaLabel = isVideo ? "video" : "ảnh";
     const get = (n) => (node.widgets || []).find((x) => x.name === n);
     const folderValue = () => { const w = get("drive_folder"); return w ? String(w.value || "") : ""; };
     const getEntries = () => {
+      if (isVideoLoader) {
+        const value = get("video")?.value;
+        return value ? [value.replace(/ \[input\]$/, "")] : [];
+      }
       const w = get("images");
       if (!w) return [];
       // uu tien gia tri that su dang hien trong o text (tranh doc gia tri cu)
@@ -446,6 +457,7 @@ app.registerExtension({
     // ---- xem truoc tren node (toi da 4 anh dau) ----
     let previewToken = 0;
     function updatePreview() {
+      if (isVideo) return;
       const token = ++previewToken;
       const entries = getEntries().slice(0, 4);
       if (!entries.length) {
@@ -480,6 +492,17 @@ app.registerExtension({
     }
 
     function setEntries(list) {
+      if (isVideoLoader) {
+        const widget = get("video");
+        const value = list[0];
+        if (!widget || !value) return;
+        const choices = widget.options?.values;
+        if (Array.isArray(choices) && !choices.includes(value)) widget.options.values = [...choices, value];
+        widget.value = value;
+        widget.callback?.(value);
+        node.setDirtyCanvas(true, true);
+        return;
+      }
       const w = get("images");
       if (!w) return;
       const v = list.join("\n");
@@ -497,7 +520,8 @@ app.registerExtension({
 
     const browseBtn = node.addWidget("button", "Browse files...", null, () => openBrowser());
     browseBtn.serialize = false;
-    if (!isSaver) {
+    if (isVideo) browseBtn.options.serialize = false;
+    if (!isSaver && !isVideo) {
       const clearBtn = node.addWidget("button", "Clear selection", null, () => setEntries([]));
       clearBtn.serialize = false;
     }
@@ -506,7 +530,8 @@ app.registerExtension({
     function openBrowser() {
       const existing = getEntries();          // anh da chon tu truoc: giu nguyen, chi them vao
       const selected = new Set(existing);
-      let tab = isSaver ? "drive_folder" : lastTab;
+      let tab = isVideo ? (isVideoSaver ? "output_folder" : "input_folder")
+        : (isSaver ? "drive_folder" : lastTab);
       let data = null;
       let marks = [];
       let actionBusy = false;
@@ -544,13 +569,13 @@ app.registerExtension({
       okBtn.style.color = "#fff";
       const fileInput = el("input", { display: "none" });
       fileInput.type = "file";
-      fileInput.multiple = true;
-      fileInput.accept = "image/*";
+      fileInput.multiple = !isVideo;
+      fileInput.accept = isVideo ? ".mp4,.mov,.webm,.mkv,.gif,.webp,.avi,.m4v" : "image/*";
       if (isSaver) {
         header.append(upBtn, el("div", { flex: "1" }), cancelBtn);
       } else {
-        header.append(inputTab, driveTab, upBtn, uploadBtn, fileInput,
-          el("div", { flex: "1" }), okBtn, cancelBtn);
+        if (!isVideo) header.append(inputTab, driveTab);
+        header.append(upBtn, uploadBtn, fileInput, el("div", { flex: "1" }), okBtn, cancelBtn);
       }
 
       const toolbar = el("div", {
@@ -560,16 +585,21 @@ app.registerExtension({
       selAllBtn.textContent = "Chọn tất cả";
       clearSelBtn.textContent = "Bỏ chọn";
       const countLabel = el("span", { marginRight: "auto", fontSize: "12px" });
-      const downloadBtn = mkBtn("Tải ảnh");
+      const downloadBtn = mkBtn("Tải " + mediaLabel);
       const stripBtn = mkBtn("Xoá metadata");
-      const deleteBtn = mkBtn("Xoá ảnh");
+      const deleteBtn = mkBtn("Xoá " + mediaLabel);
       deleteBtn.style.color = "#ff9e9e";
       const actionStatus = el("div", {
         width: "100%", maxHeight: "70px", overflow: "auto", fontSize: "12px", overflowWrap: "anywhere",
       });
       actionStatus.hidden = true;
       actionStatus.setAttribute("role", "status");
-      toolbar.append(selAllBtn, clearSelBtn, countLabel, downloadBtn, stripBtn, deleteBtn, actionStatus);
+      if (!isVideoLoader) toolbar.append(selAllBtn, clearSelBtn);
+      toolbar.append(countLabel);
+      if (!isVideoLoader) toolbar.append(downloadBtn);
+      if (!isVideo) toolbar.append(stripBtn);
+      if (!isVideoLoader) toolbar.append(deleteBtn);
+      toolbar.append(actionStatus);
 
       const pathLbl = el("div", {
         padding: "4px 10px", fontSize: "12px", opacity: "0.8", overflow: "hidden",
@@ -596,9 +626,9 @@ app.registerExtension({
       function refreshMarks() {
         marks.forEach((mark) => mark());
         const count = checkedFiles().length;
-        countLabel.textContent = count + " ảnh đã chọn trong thư mục này";
+        countLabel.textContent = count + " " + mediaLabel + " đã chọn trong thư mục này";
         okBtn.textContent = "OK (" + selected.size + ")";
-        okBtn.disabled = actionBusy;
+        okBtn.disabled = actionBusy || (isVideoLoader && !selected.size);
         selAllBtn.disabled = actionBusy || !data?.files.length;
         clearSelBtn.disabled = actionBusy || !selected.size;
         for (const button of [downloadBtn, stripBtn, deleteBtn]) {
@@ -619,7 +649,7 @@ app.registerExtension({
         const count = files.length;
         if (action === "download" && count === 1) {
           const file = files[0];
-          const query = new URLSearchParams({ entry: file.value, drive_folder: driveFolder, download: "1" });
+          const query = new URLSearchParams({ entry: file.value, kind, source: tab, drive_folder: driveFolder, download: "1" });
           const link = el("a");
           link.href = api.apiURL("/load_image_metadata/full?" + query);
           link.download = file.name;
@@ -628,18 +658,18 @@ app.registerExtension({
         }
         if (action !== "download") {
           const verb = action === "delete" ? "Xoá vĩnh viễn" : "Xoá metadata khỏi";
-          const target = count === 1 ? "ảnh “" + files[0].name + "”" : count + " ảnh trong thư mục này";
+          const target = count === 1 ? mediaLabel + " “" + files[0].name + "”" : count + " " + mediaLabel + " trong thư mục này";
           if (!window.confirm(verb + " " + target + "?")) return;
         }
         actionBusy = true;
         refreshMarks();
-        showStatus(action === "download" ? "Đang tạo ZIP…" : "Đang xử lý " + count + " ảnh…");
+        showStatus(action === "download" ? "Đang tạo ZIP…" : "Đang xử lý " + count + " " + mediaLabel + "…");
         try {
           const response = await api.fetchApi("/load_image_metadata/actions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              action, source: tab, drive_folder: driveFolder,
+              action, kind, source: tab, drive_folder: driveFolder,
               paths: files.map((file) => join(folder.path, file.name)),
             }),
           });
@@ -651,7 +681,7 @@ app.registerExtension({
             const url = URL.createObjectURL(await response.blob());
             const link = el("a");
             link.href = url;
-            link.download = "comfy-images.zip";
+            link.download = isVideo ? "comfy-videos.zip" : "comfy-images.zip";
             link.click();
             setTimeout(() => URL.revokeObjectURL(url), 30000);
             showStatus("");
@@ -668,7 +698,7 @@ app.registerExtension({
             if (remaining.length !== entries.length) setEntries(remaining);
           }
           const failures = result.errors.map(({ path, error }) => path.split("/").pop() + " (" + error + ")");
-          showStatus("Đã xử lý " + succeeded.size + "/" + count + " ảnh."
+          showStatus("Đã xử lý " + succeeded.size + "/" + count + " " + mediaLabel + "."
             + (failures.length ? " Lỗi: " + failures.join(", ") : ""));
           if (overlay.isConnected && version === loadVersion) await load(folder.path);
         } catch (error) {
@@ -700,8 +730,8 @@ app.registerExtension({
         data = null;
         refreshMarks();
         body.replaceChildren(el("div", { padding: "10px" }, "Loading..."));
-        const params = new URLSearchParams({ source, drive_folder: driveFolder });
-        if (isSaver) params.set("export_today", "1");
+        const params = new URLSearchParams({ source, kind, drive_folder: driveFolder });
+        if (isSaver && !isVideo) params.set("export_today", "1");
         if (path !== null && path !== undefined) params.set("path", path);
         let d;
         try {
@@ -753,28 +783,36 @@ app.registerExtension({
             direction: "rtl", textAlign: "right",
           });
           fileLabel.append(el("bdi", null, f.name));
-          const viewBtn = mkBtn(isSaver ? "Xem" : "✎");
+          const viewBtn = mkBtn(isSaver || isVideo ? "Xem" : "✎");
           Object.assign(viewBtn.style, {
             position: "absolute", top: "8px", left: "8px", padding: "2px 6px",
             color: "#fff", background: "rgba(0,0,0,0.7)",
           });
-          viewBtn.title = isSaver ? "Xem ảnh kích thước đầy đủ" : "Xem ảnh hoặc vẽ mask";
+          viewBtn.title = isVideo ? "Xem video" : isSaver ? "Xem ảnh kích thước đầy đủ" : "Xem ảnh hoặc vẽ mask";
           viewBtn.onclick = (event) => {
             event.stopPropagation();
-            if (!isSaver) {
+            if (!isSaver && !isVideo) {
               openMaskEditor(f);
               return;
             }
             const dialog = el("dialog", { maxWidth: "95vw", background: "var(--comfy-menu-bg, #202020)" });
-            const full = el("img", { display: "block", maxWidth: "85vw", maxHeight: "80vh", objectFit: "contain" });
-            full.alt = f.name;
+            const playVideo = isVideo && !/\.(gif|webp)$/i.test(f.name);
+            const full = el(playVideo ? "video" : "img", {
+              display: "block", maxWidth: "85vw", maxHeight: "75vh", objectFit: "contain",
+            });
+            if (playVideo) {
+              full.controls = true;
+              full.preload = "metadata";
+            } else {
+              full.alt = f.name;
+            }
             const closeImage = mkBtn("Đóng");
             closeImage.onclick = () => dialog.close();
             dialog.addEventListener("close", () => dialog.remove(), { once: true });
-            const query = new URLSearchParams({ entry: f.value, drive_folder: driveFolder });
+            const query = new URLSearchParams({ entry: f.value, source, kind, drive_folder: driveFolder });
             full.src = api.apiURL("/load_image_metadata/full?" + query);
             query.set("download", "1");
-            const download = el("a", { ...baseBtn, display: "inline-block", marginRight: "6px" }, "Tải ảnh gốc");
+            const download = el("a", { ...baseBtn, display: "inline-block", marginRight: "6px" }, "Tải " + mediaLabel + " gốc");
             download.href = api.apiURL("/load_image_metadata/full?" + query);
             download.download = f.name;
             dialog.append(full, download, closeImage);
@@ -787,7 +825,7 @@ app.registerExtension({
             position: "absolute", bottom: "22px", right: "8px", display: "flex", gap: "4px",
           });
           t.append(metadataBadges);
-          img.addEventListener("load", async () => {
+          if (!isVideo) img.addEventListener("load", async () => {
             const query = new URLSearchParams({ entry: f.value, drive_folder: driveFolder });
             try {
               const response = await api.fetchApi("/load_image_metadata/metadata?" + query, { cache: "no-store" });
@@ -825,8 +863,15 @@ app.registerExtension({
               console.debug("ShankImageLoad metadata:", error);
             }
           }, { once: true });
+          if (isVideo) {
+            img.addEventListener("error", () => {
+              img.replaceWith(el("div", {
+                height: "110px", display: "grid", placeItems: "center", background: "#111",
+              }, "Video"));
+            }, { once: true });
+          }
           img.src = api.apiURL("/load_image_metadata/thumb?" + new URLSearchParams({
-            source, drive_folder: driveFolder, path: join(d.path, f.name), version: f.version,
+            source, kind, drive_folder: driveFolder, path: join(d.path, f.name), version: f.version,
           }).toString());
 
           marks.push(() => {
@@ -834,7 +879,12 @@ app.registerExtension({
             t.style.outline = checkbox.checked ? "2px solid #2d7ff9" : "none";
           });
           const toggle = () => {
-            if (selected.has(f.value)) selected.delete(f.value); else selected.add(f.value);
+            if (selected.has(f.value)) {
+              selected.delete(f.value);
+            } else {
+              if (isVideoLoader) selected.clear();
+              selected.add(f.value);
+            }
             refreshMarks();
           };
           checkbox.onclick = (event) => event.stopPropagation();
@@ -1084,6 +1134,7 @@ app.registerExtension({
             const r = await api.fetchApi("/upload/image", { method: "POST", body: fd });
             if (r.status === 200) {
               const j = await r.json();
+              if (isVideoLoader) selected.clear();
               selected.add((j.subfolder ? j.subfolder + "/" : "") + j.name);
             } else {
               console.warn("Upload failed", r.status, r.statusText);
@@ -1096,7 +1147,12 @@ app.registerExtension({
       };
 
       document.body.append(overlay);
-      load(null);
+      const videoPath = isVideoSaver ? get("filename_prefix")?.value : existing[0];
+      const videoFolder = videoPath?.split(/[\\/]/).slice(0, -1).join("/");
+      const initialFolder = isVideo ? (node.shankVideoSubfolder ?? videoFolder) : null;
+      load(initialFolder || null).then(() => {
+        if (initialFolder && !data && loadVersion === 1 && overlay.isConnected) load(null);
+      });
     }
 
     const origConfigure = node.onConfigure;
@@ -1179,17 +1235,34 @@ def _thumb_path_for_entry(entry, template):
     return _join_inside(folder_paths.get_input_directory(), e)[0]
 
 
-def _action_image_path(root, relative_path):
+def _is_media_name(name, kind):
+    if kind == "video":
+        return os.path.splitext(name)[1].lower() in VIDEO_EXTENSIONS
+    return _is_image_name(name)
+
+
+def _media_browse_root(source, template, kind):
+    if kind == "image":
+        return _browse_root(source, template)
+    if kind == "video":
+        if source == "input_folder":
+            return folder_paths.get_input_directory()
+        if source == "output_folder":
+            return folder_paths.get_output_directory()
+    raise ValueError("Invalid media source")
+
+
+def _action_media_path(root, relative_path, kind="image"):
     path, _ = _join_inside(root, relative_path)
-    if not _is_image_name(path) or os.path.islink(path):
-        raise ValueError("Expected a regular image file")
+    if not _is_media_name(path, kind) or os.path.islink(path):
+        raise ValueError(f"Expected a regular {kind} file")
     if not os.path.isfile(path):
-        raise FileNotFoundError("Image not found")
+        raise FileNotFoundError(f"{kind.capitalize()} not found")
     return path
 
 
-def _write_image_zip(output, root, relative_paths):
-    paths = list(dict.fromkeys(_action_image_path(root, relative) for relative in relative_paths))
+def _write_media_zip(output, root, relative_paths, kind):
+    paths = list(dict.fromkeys(_action_media_path(root, relative, kind) for relative in relative_paths))
     directory = os.path.commonpath([os.path.dirname(path) for path in paths])
     with zipfile.ZipFile(output, "w") as archive:
         for path in paths:
@@ -1197,12 +1270,12 @@ def _write_image_zip(output, root, relative_paths):
     output.seek(0)
 
 
-def _mutate_images(root, relative_paths, action):
+def _mutate_media(root, relative_paths, action, kind):
     mutate = os.unlink if action == "delete" else _strip_image_metadata
     done, errors = [], []
     for relative in relative_paths:
         try:
-            mutate(_action_image_path(root, relative))
+            mutate(_action_media_path(root, relative, kind))
             done.append(relative)
         except (OSError, ValueError, SyntaxError, Image.DecompressionBombError) as error:
             errors.append({"path": relative, "error": str(error)})
@@ -1432,6 +1505,21 @@ def _make_thumb(path):
     return buf.getvalue()
 
 
+def _make_video_thumb(path):
+    from ._video_helper.videohelpersuite.utils import ffmpeg_path, local_video_input
+    result = subprocess.run(
+        [ffmpeg_path, "-nostdin", "-v", "error", "-threads", "1", *local_video_input(path), "-map", "0:v:0",
+         "-vf", "scale=256:144:force_original_aspect_ratio=decrease",
+         "-frames:v", "1", "-threads", "1", "-c:v", "mjpeg", "-f", "image2pipe", "pipe:1"],
+        capture_output=True,
+        check=True,
+        timeout=15,
+    )
+    if not result.stdout:
+        raise ValueError("Video has no frames")
+    return result.stdout
+
+
 def _make_full_png(path):
     """Anh goc (da xoay theo EXIF, giong luc load) -> PNG de trinh duyet hien thi/ve mask."""
     import io
@@ -1500,14 +1588,16 @@ def _register_routes():
         from server import PromptServer
 
         routes = PromptServer.instance.routes
+        thumbnail_slots = asyncio.Semaphore(2)
 
         @routes.get("/load_image_metadata/browse")
         async def _browse(request):
             q = request.rel_url.query
             source = q.get("source", "input_folder")
             template = q.get("drive_folder", "")
+            kind = q.get("kind", "image")
             try:
-                root = _browse_root(source, template)
+                root = _media_browse_root(source, template, kind)
                 today = ""
                 if source == "drive_folder":
                     if q.get("export_today") == "1" and not template:
@@ -1529,9 +1619,11 @@ def _register_routes():
                         if e.name.startswith("."):
                             continue
                         try:
+                            if kind == "video" and (e.is_symlink() or not _inside(root, e.path)):
+                                continue
                             if e.is_dir():
                                 dirs.append(e.name)
-                            elif e.is_file() and _is_image_name(e.name):
+                            elif e.is_file() and _is_media_name(e.name, kind):
                                 files.append((e.stat().st_mtime_ns, e.name))
                         except OSError:
                             continue
@@ -1539,7 +1631,7 @@ def _register_routes():
                 files.sort(reverse=True)  # moi nhat len tren
                 out_files = []
                 for version, name in files[:3000]:
-                    value = (f"{rel}/{name}" if rel else name) if source == "input_folder" \
+                    value = (f"{rel}/{name}" if rel else name) if source != "drive_folder" \
                         else os.path.join(cur, name)
                     out_files.append({"name": name, "value": value, "version": str(version)})
                 return web.json_response({
@@ -1553,6 +1645,13 @@ def _register_routes():
             q = request.rel_url.query
             try:
                 template = q.get("drive_folder", "")
+                if q.get("kind") == "video":
+                    root = _media_browse_root(q.get("source"), template, "video")
+                    path = _action_media_path(root, q.get("path", ""), "video")
+                    async with thumbnail_slots:
+                        data = await asyncio.to_thread(_make_video_thumb, path)
+                    return web.Response(body=data, content_type="image/jpeg",
+                                        headers={"Cache-Control": "max-age=3600"})
                 if q.get("entry") is not None:
                     p = _thumb_path_for_entry(q.get("entry"), template)
                 else:
@@ -1581,14 +1680,21 @@ def _register_routes():
         async def _full(request):
             q = request.rel_url.query
             try:
-                p = _thumb_path_for_entry(q.get("entry"), q.get("drive_folder", ""))
-                if not (os.path.isfile(p) and _is_image_name(p)):
-                    return web.Response(status=404)
+                template = q.get("drive_folder", "")
+                if q.get("kind") == "video":
+                    root = _media_browse_root(q.get("source"), template, "video")
+                    p = _action_media_path(root, q.get("entry", ""), "video")
+                else:
+                    p = _thumb_path_for_entry(q.get("entry"), template)
+                    if not (os.path.isfile(p) and _is_image_name(p)):
+                        return web.Response(status=404)
                 if q.get("download") == "1":
                     filename = quote(os.path.basename(p), safe="")
                     return web.FileResponse(p, headers={
                         "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
                     })
+                if q.get("kind") == "video":
+                    return web.FileResponse(p, headers={"Cache-Control": "no-cache"})
                 data = await asyncio.get_running_loop().run_in_executor(None, _make_full_png, p)
                 return web.Response(body=data, content_type="image/png",
                                     headers={"Cache-Control": "no-cache"})
@@ -1604,7 +1710,7 @@ def _register_routes():
                 if not isinstance(body, dict) or not isinstance(body.get("path"), str):
                     raise ValueError("Invalid image path")
                 root = _browse_root(body.get("source"), body.get("drive_folder", ""))
-                os.unlink(_action_image_path(root, body["path"]))
+                os.unlink(_action_media_path(root, body["path"]))
             except ValueError as e:
                 return web.json_response({"error": str(e)}, status=400)
             except FileNotFoundError:
@@ -1623,21 +1729,26 @@ def _register_routes():
                     raise ValueError("Invalid request")
                 action = body.get("action")
                 if action not in ("delete", "strip_metadata", "download"):
-                    raise ValueError("Invalid image action")
+                    raise ValueError("Invalid media action")
                 paths = body.get("paths")
                 if not isinstance(paths, list) or not 1 <= len(paths) <= 3000 or not all(
                     isinstance(path, str) and path for path in paths
                 ):
-                    raise ValueError("Expected a list of image paths")
+                    raise ValueError("Expected a list of media paths")
                 paths = list(dict.fromkeys(paths))
-                root = _browse_root(body.get("source"), body.get("drive_folder", ""))
+                kind = body.get("kind", "image")
+                source = body.get("source")
+                root = _media_browse_root(source, body.get("drive_folder", ""), kind)
+                if kind == "video" and (action == "strip_metadata" or (action == "delete" and source != "output_folder")):
+                    raise ValueError("This video action is unavailable")
                 if action != "download":
-                    return web.json_response(await asyncio.to_thread(_mutate_images, root, paths, action))
+                    return web.json_response(await asyncio.to_thread(_mutate_media, root, paths, action, kind))
                 with tempfile.TemporaryFile() as output:
-                    await asyncio.to_thread(_write_image_zip, output, root, paths)
+                    await asyncio.to_thread(_write_media_zip, output, root, paths, kind)
+                    archive_name = "comfy-videos.zip" if kind == "video" else "comfy-images.zip"
                     response = web.StreamResponse(headers={
                         "Content-Type": "application/zip",
-                        "Content-Disposition": 'attachment; filename="comfy-images.zip"',
+                        "Content-Disposition": f'attachment; filename="{archive_name}"',
                         "Content-Length": str(os.fstat(output.fileno()).st_size),
                     })
                     await response.prepare(request)

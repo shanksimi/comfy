@@ -380,3 +380,16 @@ với `python -m pip install -r requirements-sam2.txt`. Node hỗ trợ tạo ma
 
 - `LBW` dùng mã và preset đi kèm từ [Inspire Pack · d23db9a](https://github.com/ltdrdata/ComfyUI-Inspire-Pack/blob/d23db9aa544de9a6d4c609cb7005fa9e0d42031d/inspire/lora_block_weight.py), theo [GPL-3.0](nodes/_inspire_lbw/LICENSE).
 - `LOADER=nunchaku` dùng logic từ [ComfyUI-nunchaku · b600f87](https://github.com/nunchaku-ai/ComfyUI-nunchaku/blob/b600f879a777fdef1466c362e850f7e8c31bf89a/nodes/lora/flux.py), theo [Apache-2.0](nodes/_nunchaku_lora/LICENCE.txt). Tùy chọn này cần thư viện `nunchaku` và đầu vào FLUX đã được nạp dưới dạng Nunchaku. Shank chưa tích hợp node nạp FLUX Nunchaku.
+
+## Upscale video
+
+Workflow `shank-video-upscale.json` dùng bốn node được tích hợp từ
+[ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite/tree/4d907bee61e92c2e65af3bd6383a4e4d356126d1).
+Mã nguồn và giấy phép GPL-3.0 nằm trong `nodes/_video_helper`.
+
+- **Load Video FFmpeg (Upload)** có nút **Browse files...** để chọn, xem hoặc tải video lên `ComfyUI/input`.
+- **Video Info (Loaded)** xuất FPS, số khung hình, kích thước và thời lượng đã nạp.
+- **Meta Batch Manager** chia video thành nhiều lô. Nối cùng một output vào hai cổng `meta_batch` của node đọc và node xuất video.
+- **Video Combine** ghép khung hình và âm thanh. Bật `save_output` để lưu vào `ComfyUI/output`. **Browse files...** cho phép xem, tải hoặc xoá video đã xuất. Output tạm khi tắt `save_output` nằm ngoài cửa sổ này.
+
+Cài dependencies từ `requirements.txt`. Nếu đã cài VideoHelperSuite riêng thì tắt bản đó trong Manager để bốn ID này do repo `comfy` đăng ký.

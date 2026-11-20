@@ -83,4 +83,14 @@ else:
     NODE_CLASS_MAPPINGS.update(_seedvr2.NODE_CLASS_MAPPINGS)
     NODE_DISPLAY_NAME_MAPPINGS.update(_seedvr2.NODE_DISPLAY_NAME_MAPPINGS)
 
+try:
+    from . import _video_helper
+except Exception:
+    logging.getLogger(__name__).exception(
+        "Video upscale nodes failed to load. Check ComfyUI and this pack's requirements."
+    )
+else:
+    NODE_CLASS_MAPPINGS.update(_video_helper.NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(_video_helper.NODE_DISPLAY_NAME_MAPPINGS)
+
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
