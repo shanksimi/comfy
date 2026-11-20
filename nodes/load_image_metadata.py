@@ -31,12 +31,17 @@ import hashlib
 import json
 import os
 import re
+import stat
+import struct
+import tempfile
+import zipfile
+import zlib
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import numpy as np
 import torch
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageChops, ImageOps, ImageSequence
 from PIL.PngImagePlugin import PngInfo
 
 import folder_paths
@@ -47,7 +52,7 @@ import node_helpers
 DRIVE_FOLDER_DEFAULT = "/content/drive/MyDrive/SD-Data/Export/ComfyUI/%Y-%m-%d"
 DRIVE_UTC_OFFSET_DEFAULT = 7  # Colab chay gio UTC; 7 = gio Viet Nam, dat 0 neu khong can
 
-IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff", ".avif"}
 
 # "Key: value, Key2: value2" with optional "quoted, values" (same idea as A1111)
 _RE_PARAM = re.compile(r'\s*([\w ]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)')
@@ -419,8 +424,8 @@ let lastTab = "input_folder";
 app.registerExtension({
   name: "ShankImageLoad.Browser",
   nodeCreated(node) {
-    const viewOnly = node.comfyClass === "ShankImageSaverSimple";
-    if (!viewOnly && node.comfyClass !== "ShankImageLoad") return;
+    const isSaver = node.comfyClass === "ShankImageSaverSimple";
+    if (!isSaver && node.comfyClass !== "ShankImageLoad") return;
     const get = (n) => (node.widgets || []).find((x) => x.name === n);
     const folderValue = () => { const w = get("drive_folder"); return w ? String(w.value || "") : ""; };
     const getEntries = () => {
@@ -492,7 +497,7 @@ app.registerExtension({
 
     const browseBtn = node.addWidget("button", "Browse files...", null, () => openBrowser());
     browseBtn.serialize = false;
-    if (!viewOnly) {
+    if (!isSaver) {
       const clearBtn = node.addWidget("button", "Clear selection", null, () => setEntries([]));
       clearBtn.serialize = false;
     }
@@ -501,9 +506,10 @@ app.registerExtension({
     function openBrowser() {
       const existing = getEntries();          // anh da chon tu truoc: giu nguyen, chi them vao
       const selected = new Set(existing);
-      let tab = viewOnly ? "drive_folder" : lastTab;
+      let tab = isSaver ? "drive_folder" : lastTab;
       let data = null;
       let marks = [];
+      let actionBusy = false;
 
       const overlay = el("div", {
         position: "fixed", inset: "0", background: "rgba(0,0,0,0.6)", zIndex: "10000",
@@ -533,19 +539,37 @@ app.registerExtension({
       const clearSelBtn = mkBtn("Clear");
       const uploadBtn = mkBtn("Upload");
       const okBtn = mkBtn("OK");
-      const cancelBtn = mkBtn(viewOnly ? "Đóng" : "Cancel");
+      const cancelBtn = mkBtn(isSaver ? "Đóng" : "Cancel");
       okBtn.style.background = "#2d7ff9";
       okBtn.style.color = "#fff";
       const fileInput = el("input", { display: "none" });
       fileInput.type = "file";
       fileInput.multiple = true;
       fileInput.accept = "image/*";
-      if (viewOnly) {
+      if (isSaver) {
         header.append(upBtn, el("div", { flex: "1" }), cancelBtn);
       } else {
-        header.append(inputTab, driveTab, upBtn, selAllBtn, clearSelBtn, uploadBtn, fileInput,
+        header.append(inputTab, driveTab, upBtn, uploadBtn, fileInput,
           el("div", { flex: "1" }), okBtn, cancelBtn);
       }
+
+      const toolbar = el("div", {
+        display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", padding: "8px 10px",
+        borderBottom: "1px solid var(--border-color, #444)",
+      });
+      selAllBtn.textContent = "Chọn tất cả";
+      clearSelBtn.textContent = "Bỏ chọn";
+      const countLabel = el("span", { marginRight: "auto", fontSize: "12px" });
+      const downloadBtn = mkBtn("Tải ảnh");
+      const stripBtn = mkBtn("Xoá metadata");
+      const deleteBtn = mkBtn("Xoá ảnh");
+      deleteBtn.style.color = "#ff9e9e";
+      const actionStatus = el("div", {
+        width: "100%", maxHeight: "70px", overflow: "auto", fontSize: "12px", overflowWrap: "anywhere",
+      });
+      actionStatus.hidden = true;
+      actionStatus.setAttribute("role", "status");
+      toolbar.append(selAllBtn, clearSelBtn, countLabel, downloadBtn, stripBtn, deleteBtn, actionStatus);
 
       const pathLbl = el("div", {
         padding: "4px 10px", fontSize: "12px", opacity: "0.8", overflow: "hidden",
@@ -555,7 +579,7 @@ app.registerExtension({
         flex: "1", overflow: "auto", padding: "10px", display: "grid",
         gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", alignContent: "start",
       });
-      panel.append(header, pathLbl, body);
+      panel.append(header, toolbar, pathLbl, body);
       overlay.append(panel);
 
       function close() {
@@ -568,7 +592,96 @@ app.registerExtension({
       cancelBtn.onclick = close;
 
       const join = (a, b) => (a ? a + "/" + b : b);
-      const refreshMarks = () => { marks.forEach((m) => m()); okBtn.textContent = "OK (" + selected.size + ")"; };
+      const checkedFiles = () => data?.files.filter((f) => selected.has(f.value)) ?? [];
+      function refreshMarks() {
+        marks.forEach((mark) => mark());
+        const count = checkedFiles().length;
+        countLabel.textContent = count + " ảnh đã chọn trong thư mục này";
+        okBtn.textContent = "OK (" + selected.size + ")";
+        okBtn.disabled = actionBusy;
+        selAllBtn.disabled = actionBusy || !data?.files.length;
+        clearSelBtn.disabled = actionBusy || !selected.size;
+        for (const button of [downloadBtn, stripBtn, deleteBtn]) {
+          button.disabled = actionBusy || !count;
+        }
+      }
+
+      function showStatus(message) {
+        actionStatus.textContent = message;
+        actionStatus.hidden = !message;
+      }
+
+      async function runAction(action, files = checkedFiles()) {
+        if (actionBusy || !data || !files.length) return;
+        const folder = data;
+        const version = loadVersion;
+        const driveFolder = folderValue();
+        const count = files.length;
+        if (action === "download" && count === 1) {
+          const file = files[0];
+          const query = new URLSearchParams({ entry: file.value, drive_folder: driveFolder, download: "1" });
+          const link = el("a");
+          link.href = api.apiURL("/load_image_metadata/full?" + query);
+          link.download = file.name;
+          link.click();
+          return;
+        }
+        if (action !== "download") {
+          const verb = action === "delete" ? "Xoá vĩnh viễn" : "Xoá metadata khỏi";
+          const target = count === 1 ? "ảnh “" + files[0].name + "”" : count + " ảnh trong thư mục này";
+          if (!window.confirm(verb + " " + target + "?")) return;
+        }
+        actionBusy = true;
+        refreshMarks();
+        showStatus(action === "download" ? "Đang tạo ZIP…" : "Đang xử lý " + count + " ảnh…");
+        try {
+          const response = await api.fetchApi("/load_image_metadata/actions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action, source: tab, drive_folder: driveFolder,
+              paths: files.map((file) => join(folder.path, file.name)),
+            }),
+          });
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || response.statusText);
+          }
+          if (action === "download") {
+            const url = URL.createObjectURL(await response.blob());
+            const link = el("a");
+            link.href = url;
+            link.download = "comfy-images.zip";
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+            showStatus("");
+            return;
+          }
+          const result = await response.json();
+          const succeeded = new Set(result.done);
+          if (action === "delete") {
+            const removed = new Set(files.filter((file) => succeeded.has(join(folder.path, file.name)))
+              .map((file) => file.value));
+            for (const entry of removed) selected.delete(entry);
+            const entries = getEntries();
+            const remaining = entries.filter((entry) => !removed.has(entry));
+            if (remaining.length !== entries.length) setEntries(remaining);
+          }
+          const failures = result.errors.map(({ path, error }) => path.split("/").pop() + " (" + error + ")");
+          showStatus("Đã xử lý " + succeeded.size + "/" + count + " ảnh."
+            + (failures.length ? " Lỗi: " + failures.join(", ") : ""));
+          if (overlay.isConnected && version === loadVersion) await load(folder.path);
+        } catch (error) {
+          showStatus("Không hoàn tất thao tác: " + error.message);
+        } finally {
+          actionBusy = false;
+          refreshMarks();
+        }
+      }
+
+      downloadBtn.onclick = () => runAction("download");
+      stripBtn.onclick = () => runAction("strip_metadata");
+      deleteBtn.onclick = () => runAction("delete");
 
       function styleTabs() {
         const on = (b, active) => { b.style.background = active ? "#2d7ff9" : "var(--comfy-input-bg, #333)"; b.style.color = active ? "#fff" : "var(--input-text, #ddd)"; };
@@ -584,9 +697,11 @@ app.registerExtension({
         const driveFolder = folderValue();
         styleTabs();
         marks = [];
+        data = null;
+        refreshMarks();
         body.replaceChildren(el("div", { padding: "10px" }, "Loading..."));
         const params = new URLSearchParams({ source, drive_folder: driveFolder });
-        if (viewOnly) params.set("export_today", "1");
+        if (isSaver) params.set("export_today", "1");
         if (path !== null && path !== undefined) params.set("path", path);
         let d;
         try {
@@ -627,66 +742,47 @@ app.registerExtension({
           });
           const img = el("img", { width: "100%", height: "110px", objectFit: "contain", background: "#111" });
           img.loading = "lazy";
-          const badge = el("div", {
-            position: "absolute", top: "8px", right: "8px", width: "20px", height: "20px",
-            borderRadius: "50%", background: "#2d7ff9", color: "#fff", display: "none",
-            alignItems: "center", justifyContent: "center", fontSize: "13px",
-          }, "\u2713");
+          const checkbox = el("input", {
+            position: "absolute", top: "8px", right: "8px", width: "18px", height: "18px",
+            margin: "0", accentColor: "#2d7ff9", cursor: "pointer",
+          });
+          checkbox.type = "checkbox";
+          checkbox.setAttribute("aria-label", "Chọn " + f.name);
           const fileLabel = el("div", {
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             direction: "rtl", textAlign: "right",
           });
           fileLabel.append(el("bdi", null, f.name));
-          t.append(img, badge, fileLabel);
-          t.title = f.name;
-          const editBtn = el("div", {
-            position: "absolute", top: "8px", left: "8px", width: "22px", height: "22px",
-            borderRadius: "4px", background: "rgba(0,0,0,0.65)", color: "#fff", display: "flex",
-            alignItems: "center", justifyContent: "center", fontSize: "13px",
-          }, "\u270E");
-          editBtn.title = "View full size / draw mask";
-          editBtn.onclick = (ev) => { ev.stopPropagation(); openMaskEditor(f); };
-          const deleteBtn = el("button", {
-            position: "absolute", top: "8px", left: viewOnly ? "8px" : "36px",
-            minWidth: "22px", height: "22px", padding: "0 5px", borderRadius: "4px",
-            border: "0", background: "#8a2929", color: "#fff",
-            cursor: "pointer",
-          }, viewOnly ? "Xóa" : "×");
-          deleteBtn.type = "button";
-          deleteBtn.title = "Xóa ảnh";
-          deleteBtn.setAttribute("aria-label", "Xóa " + f.name);
-          let deleting = false;
-          async function deleteImage(button, onDeleted) {
-            if (deleting || !window.confirm("Xóa vĩnh viễn ảnh “" + f.name + "”?")) return;
-            deleting = true;
-            button.disabled = true;
-            try {
-              const response = await api.fetchApi("/load_image_metadata/delete", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ source, drive_folder: driveFolder, path: join(d.path, f.name) }),
-              });
-              const result = await response.json();
-              if (!response.ok) throw new Error(result.error || response.statusText);
-              selected.delete(f.value);
-              const entries = getEntries();
-              if (entries.includes(f.value)) setEntries(entries.filter((entry) => entry !== f.value));
-              refreshMarks();
-              onDeleted?.();
-              if (overlay.isConnected && version === loadVersion) await load(d.path);
-            } catch (error) {
-              if (overlay.isConnected) window.alert("Không xóa được ảnh: " + error.message);
-            } finally {
-              deleting = false;
-              button.disabled = false;
+          const viewBtn = mkBtn(isSaver ? "Xem" : "✎");
+          Object.assign(viewBtn.style, {
+            position: "absolute", top: "8px", left: "8px", padding: "2px 6px",
+            color: "#fff", background: "rgba(0,0,0,0.7)",
+          });
+          viewBtn.title = isSaver ? "Xem ảnh kích thước đầy đủ" : "Xem ảnh hoặc vẽ mask";
+          viewBtn.onclick = (event) => {
+            event.stopPropagation();
+            if (!isSaver) {
+              openMaskEditor(f);
+              return;
             }
-          }
-          deleteBtn.onclick = (ev) => {
-            ev.stopPropagation();
-            return deleteImage(deleteBtn);
+            const dialog = el("dialog", { maxWidth: "95vw", background: "var(--comfy-menu-bg, #202020)" });
+            const full = el("img", { display: "block", maxWidth: "85vw", maxHeight: "80vh", objectFit: "contain" });
+            full.alt = f.name;
+            const closeImage = mkBtn("Đóng");
+            closeImage.onclick = () => dialog.close();
+            dialog.addEventListener("close", () => dialog.remove(), { once: true });
+            const query = new URLSearchParams({ entry: f.value, drive_folder: driveFolder });
+            full.src = api.apiURL("/load_image_metadata/full?" + query);
+            query.set("download", "1");
+            const download = el("a", { ...baseBtn, display: "inline-block", marginRight: "6px" }, "Tải ảnh gốc");
+            download.href = api.apiURL("/load_image_metadata/full?" + query);
+            download.download = f.name;
+            dialog.append(full, download, closeImage);
+            overlay.append(dialog);
+            dialog.showModal();
           };
-          if (!viewOnly) t.append(editBtn);
-          t.append(deleteBtn);
+          t.append(img, checkbox, viewBtn, fileLabel);
+          t.title = f.name;
           const metadataBadges = el("div", {
             position: "absolute", bottom: "22px", right: "8px", display: "flex", gap: "4px",
           });
@@ -730,43 +826,20 @@ app.registerExtension({
             }
           }, { once: true });
           img.src = api.apiURL("/load_image_metadata/thumb?" + new URLSearchParams({
-            source: tab, drive_folder: folderValue(), path: join(d.path, f.name),
+            source, drive_folder: driveFolder, path: join(d.path, f.name), version: f.version,
           }).toString());
 
-          const mark = () => {
-            const on = selected.has(f.value);
-            badge.style.display = on ? "flex" : "none";
-            t.style.outline = on ? "2px solid #2d7ff9" : "none";
-          };
-          marks.push(mark);
-          t.onclick = () => {
-            if (viewOnly) {
-              const dialog = el("dialog", { maxWidth: "95vw", background: "var(--comfy-menu-bg, #202020)" });
-              const full = el("img", { display: "block", maxWidth: "85vw", maxHeight: "80vh", objectFit: "contain" });
-              full.alt = f.name;
-              const closeImage = mkBtn("Đóng");
-              closeImage.onclick = () => dialog.close();
-              dialog.addEventListener("close", () => dialog.remove(), { once: true });
-              const query = new URLSearchParams({ entry: f.value, drive_folder: driveFolder });
-              const fullUrl = "/load_image_metadata/full?";
-              full.src = api.apiURL(fullUrl + query);
-              query.set("download", "1");
-              const download = el("a", { ...baseBtn, display: "inline-block", marginRight: "6px" }, "Tải ảnh gốc");
-              download.href = api.apiURL(fullUrl + query);
-              download.download = f.name;
-              const deleteFull = mkBtn("Xóa ảnh");
-              deleteFull.style.background = "#8a2929";
-              deleteFull.style.color = "#fff";
-              deleteFull.style.marginRight = "6px";
-              deleteFull.onclick = () => deleteImage(deleteFull, () => dialog.close());
-              dialog.append(full, download, deleteFull, closeImage);
-              overlay.append(dialog);
-              dialog.showModal();
-              return;
-            }
+          marks.push(() => {
+            checkbox.checked = selected.has(f.value);
+            t.style.outline = checkbox.checked ? "2px solid #2d7ff9" : "none";
+          });
+          const toggle = () => {
             if (selected.has(f.value)) selected.delete(f.value); else selected.add(f.value);
             refreshMarks();
           };
+          checkbox.onclick = (event) => event.stopPropagation();
+          checkbox.onchange = toggle;
+          t.onclick = toggle;
           body.append(t);
         }
         if (!d.dirs.length && !d.files.length) {
@@ -982,8 +1055,7 @@ app.registerExtension({
       };
       selAllBtn.onclick = () => {
         if (!data || !data.files.length) return;
-        const all = data.files.every((f) => selected.has(f.value));
-        for (const f of data.files) { if (all) selected.delete(f.value); else selected.add(f.value); }
+        for (const f of data.files) selected.add(f.value);
         refreshMarks();
       };
       clearSelBtn.onclick = () => { selected.clear(); refreshMarks(); };
@@ -1000,13 +1072,15 @@ app.registerExtension({
         const files = [...fileInput.files];
         fileInput.value = "";
         if (!files.length || !data) return;
+        const folder = data.path;
+        const version = loadVersion;
         pathLbl.textContent = "Uploading " + files.length + " file...";
         for (const file of files) {
           try {
             const fd = new FormData();
             fd.append("image", file);
             fd.append("type", "input");
-            fd.append("subfolder", data.path || "");
+            fd.append("subfolder", folder);
             const r = await api.fetchApi("/upload/image", { method: "POST", body: fd });
             if (r.status === 200) {
               const j = await r.json();
@@ -1018,7 +1092,7 @@ app.registerExtension({
             console.warn("Upload error", e);
           }
         }
-        load(data.path);
+        if (version === loadVersion) load(folder);
       };
 
       document.body.append(overlay);
@@ -1105,6 +1179,36 @@ def _thumb_path_for_entry(entry, template):
     return _join_inside(folder_paths.get_input_directory(), e)[0]
 
 
+def _action_image_path(root, relative_path):
+    path, _ = _join_inside(root, relative_path)
+    if not _is_image_name(path) or os.path.islink(path):
+        raise ValueError("Expected a regular image file")
+    if not os.path.isfile(path):
+        raise FileNotFoundError("Image not found")
+    return path
+
+
+def _write_image_zip(output, root, relative_paths):
+    paths = list(dict.fromkeys(_action_image_path(root, relative) for relative in relative_paths))
+    directory = os.path.commonpath([os.path.dirname(path) for path in paths])
+    with zipfile.ZipFile(output, "w") as archive:
+        for path in paths:
+            archive.write(path, os.path.relpath(path, directory))
+    output.seek(0)
+
+
+def _mutate_images(root, relative_paths, action):
+    mutate = os.unlink if action == "delete" else _strip_image_metadata
+    done, errors = [], []
+    for relative in relative_paths:
+        try:
+            mutate(_action_image_path(root, relative))
+            done.append(relative)
+        except (OSError, ValueError, SyntaxError, Image.DecompressionBombError) as error:
+            errors.append({"path": relative, "error": str(error)})
+    return {"done": done, "errors": errors}
+
+
 def _browser_metadata(path):
     with Image.open(path) as img:
         raw = img.info.get("parameters") or _exif_user_comment(img)
@@ -1119,6 +1223,190 @@ def _browser_metadata(path):
             "parameters": parameters,
             "has_workflow": isinstance(workflow, dict) and isinstance(workflow.get("nodes"), list),
         }
+
+
+def _clean_png(data, exif):
+    # Keep pixel, animation, transparency and color-management chunks.
+    keep = {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS", b"iCCP", b"sRGB",
+            b"gAMA", b"cHRM", b"cICP", b"mDCv", b"cLLi", b"sBIT", b"acTL", b"fcTL", b"fdAT"}
+    chunks = [data[:8]]
+    pos = 8
+    while pos + 12 <= len(data):
+        size, tag = struct.unpack_from(">I4s", data, pos)
+        end = pos + 12 + size
+        if end > len(data):
+            break
+        if tag in keep:
+            chunks.append(data[pos:end])
+        if tag == b"IHDR" and exif:
+            payload = b"eXIf" + exif[6:]
+            chunks.append(struct.pack(">I", len(payload) - 4) + payload
+                          + struct.pack(">I", zlib.crc32(payload)))
+        if tag == b"IEND":
+            return b"".join(chunks)
+        pos = end
+    raise ValueError("Invalid PNG chunks")
+
+
+_JPEG_SCAN_END = re.compile(rb"\xff+(?![\xff\x00\xd0-\xd7])")
+
+
+def _clean_jpeg(data, exif):
+    chunks = [data[:2]]
+    pos = 2
+    while pos < len(data) and data[pos] == 0xff:
+        start = pos
+        while pos < len(data) and data[pos] == 0xff:
+            pos += 1
+        if pos >= len(data):
+            break
+        marker = data[pos]
+        if marker == 0xd9:
+            return b"".join([*chunks, data[start:pos + 1]])
+        size = int.from_bytes(data[pos + 1:pos + 3], "big")
+        end = pos + 1 + size
+        if size < 2 or end > len(data):
+            break
+        payload = data[pos + 3:end]
+        if marker < 0xe0 or (marker > 0xef and marker != 0xfe):
+            chunks.append(data[start:end])
+        elif ((marker == 0xe0 and payload.startswith(b"JFIF\0"))
+              or (marker == 0xe2 and payload.startswith(b"ICC_PROFILE\0"))
+              or (marker == 0xee and payload.startswith(b"Adobe"))):
+            chunks.append(data[start:end])
+        if marker == 0xda:
+            if exif:
+                chunks.insert(1, b"\xff\xe1" + struct.pack(">H", len(exif) + 2) + exif)
+                exif = b""
+            next_marker = _JPEG_SCAN_END.search(data, end)
+            if next_marker is None:
+                break
+            chunks.append(data[end:next_marker.start()])
+            end = next_marker.start()
+        pos = end
+    raise ValueError("Invalid JPEG markers")
+
+
+def _clean_webp(data, exif):
+    chunks = []
+    pos = 12
+    limit = 8 + struct.unpack_from("<I", data, 4)[0]
+    if limit > len(data):
+        raise ValueError("Invalid WebP size")
+    while pos + 8 <= limit:
+        tag, size = struct.unpack_from("<4sI", data, pos)
+        end = pos + 8 + size + (size % 2)
+        if end > limit:
+            raise ValueError("Invalid WebP chunk")
+        if tag == b"VP8X":
+            flags = (data[pos + 8] & ~0x0c) | (0x08 if exif else 0)
+            chunks.append(data[pos:pos + 8] + bytes([flags]) + data[pos + 9:end])
+        elif tag in {b"ICCP", b"ANIM", b"ANMF", b"ALPH", b"VP8 ", b"VP8L"}:
+            chunks.append(data[pos:end])
+        pos = end
+    if pos != limit:
+        raise ValueError("Invalid WebP chunks")
+    if exif:
+        chunks.append(b"EXIF" + struct.pack("<I", len(exif)) + exif + b"\0" * (len(exif) % 2))
+    body = b"WEBP" + b"".join(chunks)
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
+def _gif_table_size(flags):
+    return 3 * (2 << (flags & 7)) if flags & 0x80 else 0
+
+
+def _gif_block_end(data, pos):
+    while pos < len(data):
+        size = data[pos]
+        pos += size + 1
+        if not size:
+            return pos
+    raise ValueError("Invalid GIF blocks")
+
+
+def _clean_gif(data):
+    pos = 13 + _gif_table_size(data[10])
+    chunks = [data[:pos]]
+    while pos < len(data):
+        start = pos
+        if data[pos] == 0x3b:
+            return b"".join([*chunks, b";"])
+        if data[pos] == 0x2c and pos + 10 < len(data):
+            pos += 11 + _gif_table_size(data[pos + 9])
+            pos = _gif_block_end(data, pos)
+            chunks.append(data[start:pos])
+        elif data[pos] == 0x21 and pos + 2 < len(data):
+            label = data[pos + 1]
+            pos = _gif_block_end(data, pos + 2)
+            app = data[start + 3:start + 14]
+            if label == 0xf9 or (label == 0xff and app in {b"NETSCAPE2.0", b"ANIMEXTS1.0", b"ICCRGBG1012"}):
+                chunks.append(data[start:pos])
+        else:
+            break
+    raise ValueError("Invalid GIF image")
+
+
+def _save_clean_image(img, output):
+    options = {}
+    if img.format in {"TIFF", "AVIF"} and img.info.get("icc_profile"):
+        options["icc_profile"] = img.info["icc_profile"]
+    if img.format == "AVIF":
+        options.update(quality=100, subsampling="4:4:4")
+    elif img.format == "TIFF":
+        options["compression"] = "tiff_deflate"
+    if img.format == "AVIF" and "loop" in img.info:
+        options["loop"] = img.info["loop"]
+
+    frames, durations = [], []
+    for frame in ImageSequence.Iterator(img):
+        clean = ImageOps.exif_transpose(frame)
+        clean.info.clear()
+        frames.append(clean)
+        durations.append(frame.info.get("duration", 0))
+    if len(frames) > 1:
+        options.update(save_all=True, append_images=frames[1:])
+        if img.format == "AVIF":
+            options["duration"] = durations
+    frames[0].save(output, format=img.format, **options)
+
+
+def _strip_image_metadata(path):
+    cleaners = {"PNG": _clean_png, "JPEG": _clean_jpeg, "WEBP": _clean_webp}
+    original = os.stat(path)
+    with tempfile.NamedTemporaryFile(dir=os.path.dirname(path), delete=False) as output:
+        temporary = output.name
+    try:
+        with Image.open(path) as img, open(temporary, "w+b") as output:
+            if img.format == "GIF":
+                with open(path, "rb") as source:
+                    output.write(_clean_gif(source.read()))
+            elif img.format in cleaners:
+                # Retain only EXIF orientation when removing it would rotate the image.
+                orientation = img.getexif().get(274, 1)
+                exif = Image.Exif()
+                if orientation in range(2, 9):
+                    exif[274] = orientation
+                with open(path, "rb") as source:
+                    cleaned = cleaners[img.format](source.read(), exif.tobytes() if exif else b"")
+                output.write(cleaned)
+            else:
+                _save_clean_image(img, output)
+            expected_frames = img.n_frames if hasattr(img, "n_frames") else 1
+        with Image.open(temporary) as result:
+            if getattr(result, "n_frames", 1) != expected_frames:
+                raise ValueError("Unexpected frame count after removing metadata")
+            result.verify()
+        os.chmod(temporary, stat.S_IMODE(original.st_mode))
+        current = os.stat(path, follow_symlinks=False)
+        if (current.st_ino, current.st_size, current.st_mtime_ns) != (
+            original.st_ino, original.st_size, original.st_mtime_ns
+        ):
+            raise OSError("Image changed while removing metadata")
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def _make_thumb(path):
@@ -1244,16 +1532,16 @@ def _register_routes():
                             if e.is_dir():
                                 dirs.append(e.name)
                             elif e.is_file() and _is_image_name(e.name):
-                                files.append((e.stat().st_mtime, e.name))
+                                files.append((e.stat().st_mtime_ns, e.name))
                         except OSError:
                             continue
                 dirs.sort(key=str.lower)
                 files.sort(reverse=True)  # moi nhat len tren
                 out_files = []
-                for _, name in files[:3000]:
+                for version, name in files[:3000]:
                     value = (f"{rel}/{name}" if rel else name) if source == "input_folder" \
                         else os.path.join(cur, name)
-                    out_files.append({"name": name, "value": value})
+                    out_files.append({"name": name, "value": value, "version": str(version)})
                 return web.json_response({
                     "root": root, "path": rel, "abs": cur, "dirs": dirs, "files": out_files,
                 })
@@ -1316,12 +1604,7 @@ def _register_routes():
                 if not isinstance(body, dict) or not isinstance(body.get("path"), str):
                     raise ValueError("Invalid image path")
                 root = _browse_root(body.get("source"), body.get("drive_folder", ""))
-                path, _ = _join_inside(root, body["path"])
-                if not _is_image_name(path) or os.path.islink(path):
-                    raise ValueError("Expected a regular image file")
-                if not os.path.isfile(path):
-                    raise FileNotFoundError
-                os.unlink(path)
+                os.unlink(_action_image_path(root, body["path"]))
             except ValueError as e:
                 return web.json_response({"error": str(e)}, status=400)
             except FileNotFoundError:
@@ -1329,6 +1612,42 @@ def _register_routes():
             except OSError as e:
                 return web.json_response({"error": e.strerror or str(e)}, status=409)
             return web.json_response({"deleted": True})
+
+        @routes.post("/load_image_metadata/actions")
+        async def _actions(request):
+            if request.content_type != "application/json":
+                return web.json_response({"error": "Expected JSON"}, status=415)
+            try:
+                body = await request.json()
+                if not isinstance(body, dict):
+                    raise ValueError("Invalid request")
+                action = body.get("action")
+                if action not in ("delete", "strip_metadata", "download"):
+                    raise ValueError("Invalid image action")
+                paths = body.get("paths")
+                if not isinstance(paths, list) or not 1 <= len(paths) <= 3000 or not all(
+                    isinstance(path, str) and path for path in paths
+                ):
+                    raise ValueError("Expected a list of image paths")
+                paths = list(dict.fromkeys(paths))
+                root = _browse_root(body.get("source"), body.get("drive_folder", ""))
+                if action != "download":
+                    return web.json_response(await asyncio.to_thread(_mutate_images, root, paths, action))
+                with tempfile.TemporaryFile() as output:
+                    await asyncio.to_thread(_write_image_zip, output, root, paths)
+                    response = web.StreamResponse(headers={
+                        "Content-Type": "application/zip",
+                        "Content-Disposition": 'attachment; filename="comfy-images.zip"',
+                        "Content-Length": str(os.fstat(output.fileno()).st_size),
+                    })
+                    await response.prepare(request)
+                    while chunk := await asyncio.to_thread(output.read, 256 * 1024):
+                        await response.write(chunk)
+                    return response
+            except ValueError as error:
+                return web.json_response({"error": str(error)}, status=400)
+            except OSError as error:
+                return web.json_response({"error": str(error)}, status=409)
 
         @routes.post("/load_image_metadata/save_mask")
         async def _save_mask(request):
