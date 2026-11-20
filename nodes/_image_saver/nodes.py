@@ -7,7 +7,7 @@ import json
 import numpy as np
 import re
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import torch
 
 import folder_paths
@@ -127,6 +127,21 @@ def make_filename(filename: str, width: int, height: int, seed: int, modelname: 
     filename = make_pathname(filename, width, height, seed, modelname, counter, time_format, sampler_name, steps, cfg, scheduler_name, denoise, clip_skip, custom, label)
     return get_timestamp(time_format) if filename == "" else filename
 
+
+def draw_image_caption(image: Image.Image, caption: str):
+    font_size = max(10, min(28, round(image.width / 50)))
+    try:
+        font = ImageFont.load_default(size=font_size)
+    except TypeError:
+        font = ImageFont.load_default()
+    draw = ImageDraw.Draw(image)
+    left, top, right, bottom = draw.textbbox((0, 0), caption, font=font)
+    pad = max(3, font_size // 3)
+    y = image.height - (bottom - top) - 3 * pad
+    draw.rectangle((pad, y, right - left + 3 * pad, image.height - pad), fill="black")
+    draw.text((2 * pad - left, y + pad - top), caption, font=font, fill="white")
+
+
 @dataclass
 class Metadata:
     modelname: str
@@ -146,6 +161,7 @@ class Metadata:
     ckpt_path: str
     a111_params: str
     final_hashes: str
+    lllite_report: Any = None
 
 class ImageSaverMetadata:
     @classmethod
@@ -333,13 +349,14 @@ class ImageSaverSimple:
         label: str = "",
         prompt: dict[str, Any] | None = None,
         extra_pnginfo: dict[str, Any] | None = None,
+        image_caption: str = "",
     ) -> dict[str, Any]:
         if metadata is None:
             metadata = Metadata('', '', '', 512, 512, 0, 20, 7.0, '', 'normal', 1.0, 0, '', '', '', '', '')
 
         path = make_pathname(path, metadata.width, metadata.height, metadata.seed, metadata.modelname, counter, time_format, metadata.sampler_name, metadata.steps, metadata.cfg, metadata.scheduler_name, metadata.denoise, metadata.clip_skip, metadata.custom, label)
 
-        filenames = ImageSaver.save_images(images, filename, extension, path, quality_jpeg_or_webp, lossless_webp, optimize_png, prompt, extra_pnginfo, save_workflow_as_json, embed_workflow, counter, time_format, metadata, label=label)
+        filenames = ImageSaver.save_images(images, filename, extension, path, quality_jpeg_or_webp, lossless_webp, optimize_png, prompt, extra_pnginfo, save_workflow_as_json, embed_workflow, counter, time_format, metadata, label=label, image_caption=image_caption)
 
         result: dict[str, Any] = {
             "result": (metadata.final_hashes, metadata.a111_params),
@@ -469,6 +486,7 @@ class ImageSaver:
         time_format: str,
         metadata: Metadata,
         label: str = "",
+        image_caption: str = "",
     ) -> list[str]:
         filename_prefix = make_filename(filename_pattern, metadata.width, metadata.height, metadata.seed, metadata.modelname, counter, time_format, metadata.sampler_name, metadata.steps, metadata.cfg, metadata.scheduler_name, metadata.denoise, metadata.clip_skip, metadata.custom, label)
 
@@ -493,6 +511,8 @@ class ImageSaver:
         for idx, image in enumerate(images):
             i = 255. * image.cpu().numpy()
             img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            if image_caption:
+                draw_image_caption(img, image_caption)
 
             current_filename_prefix = ImageSaver.format_batch_filename(filename_prefix, base_suffix, idx)
             final_filename = f"{current_filename_prefix}.{extension}"

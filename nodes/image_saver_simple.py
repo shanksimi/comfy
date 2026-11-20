@@ -1,6 +1,8 @@
 from dataclasses import replace
 import json
 
+from .anima_lllite.report import LLLITE_REPORT
+
 
 _TOOLTIPS = {
     "images": "Ảnh hoặc batch ảnh cần lưu.",
@@ -48,7 +50,7 @@ class ShankImageSaverSimple:
     @classmethod
     def INPUT_TYPES(cls):
         upstream = cls.upstream()
-        return {
+        inputs = {
             group: {
                 name: (spec[0], {**(spec[1] if len(spec) > 1 else {}), "tooltip": _TOOLTIPS[name]})
                 if name in _TOOLTIPS else spec
@@ -56,8 +58,21 @@ class ShankImageSaverSimple:
             }
             for group, inputs in upstream.INPUT_TYPES().items()
         }
+        inputs.setdefault("optional", {})["print_lllite_report"] = ("BOOLEAN", {
+            "default": True,
+            "tooltip": "In trạng thái LLLite lên ảnh khi Metadata có lllite_report.",
+        })
+        return inputs
 
-    def save_images(self, **inputs):
+    def save_images(self, print_lllite_report=True, **inputs):
+        metadata = inputs.get("metadata")
+        report = getattr(metadata, "lllite_report", None)
+        if report is not None:
+            # Metadata can execute before sampling. Resolve the report only once we have the image.
+            params = metadata.a111_params + ", LLLite: " + json.dumps(report.metadata_text(), ensure_ascii=False)
+            inputs["metadata"] = replace(metadata, a111_params=params)
+            if print_lllite_report:
+                inputs["image_caption"] = report.summary()
         upstream = self.upstream()
         return getattr(upstream(), upstream.FUNCTION)(**inputs)
 
@@ -119,9 +134,13 @@ class ShankMetadata:
             "forceInput": True,
             "tooltip": "Nối enabled_loras từ Power LoRA để lưu tên LoRA và số patch MODEL / CLIP vào tham số ảnh.",
         })
+        optional["lllite_report"] = (LLLITE_REPORT, {
+            "forceInput": True,
+            "tooltip": "Nối lllite_report từ Apply Anima ControlNet-LLLite để lưu trạng thái khi xuất ảnh.",
+        })
         return inputs
 
-    def get_metadata(self, loras="", positive="", negative="", **inputs):
+    def get_metadata(self, loras="", positive="", negative="", lllite_report=None, **inputs):
         upstream = self.upstream()
         metadata, hashes, params = getattr(upstream(), upstream.FUNCTION)(
             positive=positive, negative=negative, **inputs,
@@ -130,4 +149,6 @@ class ShankMetadata:
         if report:
             params += ", Enabled LoRAs: " + json.dumps(report, ensure_ascii=False)
             metadata = replace(metadata, a111_params=params)
+        if lllite_report is not None:
+            metadata = replace(metadata, lllite_report=lllite_report)
         return metadata, hashes, params

@@ -4,12 +4,14 @@ app.registerExtension({
   name: "shanksimi.Metadata",
   nodeCreated(node) {
     if (node.comfyClass !== "ShankMetadata") return;
-    const lorasInput = node.inputs?.find(input => input.name === "loras");
+    const reportInputs = node.inputs?.filter(input => ["loras", "lllite_report"].includes(input.name)) ?? [];
     const configure = node.onConfigure;
     node.onConfigure = function (...args) {
       configure?.apply(this, args);
-      if (lorasInput && !this.inputs?.some(input => input.name === lorasInput.name)) {
-        this.addInput(lorasInput.name, lorasInput.type);
+      for (const input of reportInputs) {
+        if (!this.inputs?.some(existing => existing.name === input.name)) {
+          this.addInput(input.name, input.type);
+        }
       }
       for (const widget of this.widgets ?? []) {
         if ((widget.name === "positive" || widget.name === "negative") && widget.value === "unknown") {

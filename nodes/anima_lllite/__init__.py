@@ -1,4 +1,4 @@
-# Adapted from kohya-ss/ComfyUI-Anima-LLLite. Local changes: class ID and display name.
+# Adapted from kohya-ss/ComfyUI-Anima-LLLite. Local changes include sampling diagnostics.
 # Licensed under Apache-2.0. See LICENSE in this directory.
 """ComfyUI node for Anima ControlNet-LLLite.
 
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections import Counter
 from typing import Optional
 
 import torch
@@ -33,6 +34,7 @@ from .control_net_lllite_anima import (
     load_lllite_weights,
     read_lllite_metadata,
 )
+from .report import LLLITE_REPORT, LLLiteReport
 
 logger = logging.getLogger(__name__)
 
@@ -141,12 +143,15 @@ class ShankAnimaLLLiteApply:
             },
         }
 
-    RETURN_TYPES = ("MODEL",)
+    RETURN_TYPES = ("MODEL", LLLITE_REPORT)
+    RETURN_NAMES = ("MODEL", "lllite_report")
     FUNCTION = "apply"
     CATEGORY = "loaders"
 
     def apply(self, model, lllite_name, image, strength, start_percent, end_percent,
               preserve_wrapper=True, mask=None):
+        from comfy.patcher_extension import WrappersMP
+
         weights_path = folder_paths.get_full_path("controlnet", lllite_name)
         if weights_path is None or not os.path.isfile(weights_path):
             raise FileNotFoundError(f"LLLite weights not found: {lllite_name}")
@@ -201,6 +206,24 @@ class ShankAnimaLLLiteApply:
         )
         load_lllite_weights(lllite, weights_path, strict=False)
         lllite.eval().requires_grad_(False)
+        counts = Counter()
+        report = LLLiteReport(
+            filename=lllite_name,
+            strength=strength,
+            modules=len(lllite.lllite_modules),
+            start_percent=start_percent,
+            end_percent=end_percent,
+            preserve_wrapper=preserve_wrapper,
+        )
+        for module in lllite.lllite_modules:
+            module.diagnostic_counts = counts
+
+        def sample_with_report(executor, *args, **kwargs):
+            counts.clear()
+            report.counts = None
+            result = executor(*args, **kwargs)
+            report.counts = counts.copy()
+            return result
 
         # Convert percent range -> sigma range (start_percent=0 → sigma_max).
         model_sampling = model.get_model_object("model_sampling")
@@ -230,12 +253,16 @@ class ShankAnimaLLLiteApply:
             input_x = args["input"]
             timestep = args["timestep"]
             c = args["c"]
+            counts["evaluations"] += 1
 
             # Step-range gate: skip LLLite entirely when current sigma is outside
             # [sigma_end, sigma_start]. percent_to_sigma maps 0.0 → sigma_max,
             # 1.0 → sigma_min, so the active window is sigma_end <= sigma <= sigma_start.
             sigma = float(timestep.max().item())
             if not (sigma_end <= sigma <= sigma_start):
+                counts["outside_window"] += 1
+                return _call_next(apply_model, input_x, timestep, c)
+            if strength == 0:
                 return _call_next(apply_model, input_x, timestep, c)
 
             # Anima latent shape: (B, C, T, H, W) — take spatial dims from the tail.
@@ -277,7 +304,8 @@ class ShankAnimaLLLiteApply:
 
         m = model.clone()
         m.set_model_unet_function_wrapper(wrapper)
-        return (m,)
+        m.add_wrapper(WrappersMP.OUTER_SAMPLE, sample_with_report)
+        return m, report
 
 
 NODE_CLASS_MAPPINGS = {

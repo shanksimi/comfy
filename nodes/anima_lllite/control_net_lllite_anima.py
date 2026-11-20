@@ -232,6 +232,7 @@ class LLLiteModuleDiT(nn.Module):
 
         self.cond_emb: Optional[torch.Tensor] = None
         self.org_forward = None
+        self.diagnostic_counts = None
 
         # Set by the parent ControlNetLLLiteDiT after construction.
         self.layer_idx: int = -1
@@ -252,7 +253,12 @@ class LLLiteModuleDiT(nn.Module):
         #   self/cross attention q/k/v: (B, S, D) — already flattened in the Anima block
         #   mlp.layer1:                 (B, T, H, W, D) — passed un-flattened
         # Flatten the 5D case to 3D for the LLLite path and reshape on exit.
-        if self.multiplier == 0.0 or self.cond_emb is None:
+        counts = self.diagnostic_counts
+        if self.multiplier == 0.0:
+            return self.org_forward(x)
+        if self.cond_emb is None:
+            if counts is not None:
+                counts["missing_conditioning"] += 1
             return self.org_forward(x)
 
         orig_shape = x.shape
@@ -266,10 +272,14 @@ class LLLiteModuleDiT(nn.Module):
         # Broadcast cond_emb to the runtime batch (CFG cond+uncond, multi-cond).
         if x.shape[0] != cx.shape[0]:
             if x.shape[0] % cx.shape[0] != 0:
+                if counts is not None:
+                    counts["batch_mismatch"] += 1
                 return self.org_forward(x.reshape(orig_shape) if is_5d else x)
             cx = cx.repeat(x.shape[0] // cx.shape[0], 1, 1)
 
         if x.shape[1] != cx.shape[1]:
+            if counts is not None:
+                counts["token_mismatch"] += 1
             return self.org_forward(x.reshape(orig_shape) if is_5d else x)
 
         # Run the LLLite mini-MLP in its own parameter dtype, then cast the
@@ -306,6 +316,8 @@ class LLLiteModuleDiT(nn.Module):
             out = out.to(x.dtype)
 
         y = self.org_forward(x + out)
+        if counts is not None:
+            counts["applied"] += 1
 
         if is_5d:
             # org Linear out_features may differ from in_features — recover with -1.
