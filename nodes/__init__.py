@@ -16,6 +16,7 @@ from .image_saver_simple import ShankMetadata, ShankImageSaverSimple
 from .image_comparer import ShankImageComparer
 from .power_lora_loader import ShankPowerLoraLoader
 from .basic_info import ShankBasicInfo
+from .concatenate_text import ShankConcatenateText
 from .simple_math import ShankSimpleMath
 from .model_patch_loader import ShankModelPatchLoader
 
@@ -63,6 +64,9 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankPowerLoraLoader"] = "Power Lora Loader (shanksi
 
 NODE_CLASS_MAPPINGS["ShankBasicInfo"] = ShankBasicInfo
 NODE_DISPLAY_NAME_MAPPINGS["ShankBasicInfo"] = "Basic Info (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankConcatenateText"] = ShankConcatenateText
+NODE_DISPLAY_NAME_MAPPINGS["ShankConcatenateText"] = "Concatenate Text (shanksimi)"
 
 NODE_CLASS_MAPPINGS["ShankSimpleMath"] = ShankSimpleMath
 NODE_DISPLAY_NAME_MAPPINGS["ShankSimpleMath"] = "Simple Math (shanksimi)"
