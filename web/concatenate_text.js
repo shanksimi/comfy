@@ -22,23 +22,33 @@ function addRowsWidget(node, name, [, options]) {
     node.inputs.forEach((input, index) => {
       const entry = editors.get(input.name);
       if (!entry) return;
-      const { editor, row } = entry;
+      const { editor, caption, row } = entry;
       const linked = input.link != null;
       const source = linked && node.graph ? node.getInputNode(index) : null;
       const sourceTitle = linked ? (source?.getTitle?.() || source?.title || "Đang dùng cổng STRING") : "";
-      const value = linked ? sourceTitle : row[1];
-      if (editor.value !== value) editor.value = value;
-      editor.disabled = linked;
-      editor.title = sourceTitle;
+      if (editor.value !== row[1]) editor.value = row[1];
+      editor.hidden = linked;
+      caption.hidden = !linked;
+      if (caption.textContent !== sourceTitle) caption.textContent = sourceTitle;
+      caption.title = sourceTitle;
     });
+  }
+
+  function fitNode(shrink = false) {
+    const [width, height] = node.computeSize();
+    const [currentWidth, currentHeight] = node.size;
+    const nextWidth = Math.max(currentWidth, width);
+    const nextHeight = shrink ? height : Math.max(currentHeight, height);
+    if (nextWidth !== currentWidth || nextHeight !== currentHeight) {
+      node.setSize([nextWidth, nextHeight]);
+    }
   }
 
   function editRows(change) {
     node.graph?.beforeChange?.(node);
     change();
     syncRows();
-    const [width, height] = node.computeSize();
-    node.setSize([Math.max(node.size[0], width), height]);
+    fitNode(true);
     node.graph?.afterChange?.(node);
     node.setDirtyCanvas(true, true);
   }
@@ -50,12 +60,14 @@ function addRowsWidget(node, name, [, options]) {
     const editor = document.createElement("textarea");
     editor.rows = 1;
     editor.wrap = "off";
-    editor.placeholder = "Nhập văn bản";
     editor.style.cssText = "box-sizing:border-box;width:100%;height:100%;resize:none;scrollbar-width:none;padding:2px 5px;font:inherit;line-height:16px;background:var(--comfy-input-bg,#222);color:inherit;border:1px solid var(--border-color,#555);border-radius:6px";
+    const caption = document.createElement("span");
+    caption.hidden = true;
+    caption.style.cssText = "align-self:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
     const remove = button("×", "Xoá dòng", () => editRows(() => {
       rows = rows.filter(([name]) => name !== key);
     }));
-    line.append(editor, remove);
+    line.append(editor, caption, remove);
     const widget = node.addDOMWidget(key, "custom", line, {
       serialize: false,
       margin: 0,
@@ -74,12 +86,12 @@ function addRowsWidget(node, name, [, options]) {
     });
 
     editor.oninput = () => {
-      if (editor.disabled) return;
+      if (editor.hidden) return;
       editors.get(key).row[1] = editor.value;
       node.setDirtyCanvas(true, true);
     };
     editor.onchange = () => node.graph?.afterChange?.(node);
-    return { editor, remove, widget };
+    return { editor, caption, remove, widget };
   }
 
   function syncRows() {
@@ -105,9 +117,10 @@ function addRowsWidget(node, name, [, options]) {
         editors.set(key, entry);
       }
       entry.row = row;
-      const label = `Dòng ${index + 1}`;
+      const label = `Text ${index + 1}`;
+      entry.editor.placeholder = label;
       entry.editor.setAttribute("aria-label", label);
-      entry.remove.title = `Xoá ${label.toLowerCase()}`;
+      entry.remove.title = `Xoá dòng ${index + 1}`;
       entry.remove.setAttribute("aria-label", entry.remove.title);
 
       const socket = { widget: { name: key }, alwaysVisible: true, label: " " };
@@ -146,10 +159,14 @@ function addRowsWidget(node, name, [, options]) {
     const next = 1 + rows.reduce((max, [key]) => Math.max(max, Number(key.slice(5))), 0);
     rows.push([`text_${next}`, ""]);
   }));
-  add.style.cssText += ";width:100%;height:24px";
-  const addWidget = node.addDOMWidget(name, "custom", add, {
+  add.style.cssText += `;width:fit-content;max-width:100%;height:${rowHeight}px;box-sizing:border-box`;
+  const footer = document.createElement("div");
+  footer.className = "shank-concatenate-footer";
+  footer.style.cssText = `box-sizing:border-box;width:100%;min-width:0;height:${rowHeight}px;padding:0 5px 0 20px;overflow:hidden`;
+  footer.append(add);
+  const addWidget = node.addDOMWidget(name, "custom", footer, {
     socketless: true,
-    margin: 2,
+    margin: 0,
     getValue: () => JSON.stringify(rows),
     setValue: restore,
     onDraw: refreshConnections,
@@ -162,6 +179,7 @@ function addRowsWidget(node, name, [, options]) {
   node.onConfigure = function (...args) {
     onConfigure?.apply(this, args);
     syncRows();
+    fitNode();
   };
   const onConnectionsChange = node.onConnectionsChange;
   node.onConnectionsChange = function (...args) {
@@ -179,7 +197,8 @@ app.registerExtension({
     const style = document.createElement("style");
     style.textContent = `
       .shank-concatenate-row > * { pointer-events: auto; }
-      .lg-node-widgets .shank-concatenate-row { padding: 0; }
+      .lg-node-widgets .shank-concatenate-row,
+      .lg-node-widgets .shank-concatenate-footer { padding: 0; }
       [data-widget-name]:has(.shank-concatenate-row) > :first-child { opacity: 1; }
     `;
     document.head.append(style);
