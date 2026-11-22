@@ -1,10 +1,12 @@
 import { app } from "../../scripts/app.js";
 
 const rowName = /^text_[1-9][0-9]*$/;
+const rowHeight = 24;
+const rowGap = 4;
 
 function addRowsWidget(node, name, [, options]) {
   const panel = document.createElement("div");
-  panel.style.cssText = "display:grid;gap:4px;width:100%;color:var(--input-text,#ddd);font:12px sans-serif";
+  panel.style.cssText = `display:grid;gap:${rowGap}px;width:100%;color:var(--input-text,#ddd);font:12px sans-serif`;
   let rows = [];
   let editors = new Map();
 
@@ -66,11 +68,13 @@ function addRowsWidget(node, name, [, options]) {
       const [key, value] = row;
       const label = `Text ${index + 1}`;
       const line = document.createElement("div");
-      line.style.cssText = "display:grid;grid-template-columns:48px minmax(0,1fr) 26px;gap:4px;align-items:center;height:44px";
+      line.style.cssText = `display:grid;grid-template-columns:48px minmax(0,1fr) 26px;gap:${rowGap}px;align-items:center;height:${rowHeight}px`;
       const caption = document.createElement("span");
       caption.textContent = label;
       const editor = document.createElement("textarea");
-      editor.style.cssText = "box-sizing:border-box;width:100%;height:100%;resize:none;padding:4px;background:var(--comfy-input-bg,#222);color:inherit;border:1px solid var(--border-color,#555);border-radius:6px";
+      editor.rows = 1;
+      editor.wrap = "off";
+      editor.style.cssText = "box-sizing:border-box;width:100%;height:100%;resize:none;scrollbar-width:none;padding:2px 5px;font:inherit;line-height:16px;background:var(--comfy-input-bg,#222);color:inherit;border:1px solid var(--border-color,#555);border-radius:6px";
       editor.value = value;
       editor.placeholder = "Nhập văn bản";
       editor.setAttribute("aria-label", label);
@@ -88,7 +92,7 @@ function addRowsWidget(node, name, [, options]) {
       const next = 1 + rows.reduce((max, [key]) => Math.max(max, Number(key.slice(5))), 0);
       rows.push([`text_${next}`, ""]);
     }));
-    add.style.height = "24px";
+    add.style.height = `${rowHeight}px`;
     panel.append(add);
     refreshConnections();
   }
@@ -107,7 +111,7 @@ function addRowsWidget(node, name, [, options]) {
     render();
   }
 
-  const height = () => rows.length * 48 + 24;
+  const height = () => rows.length * (rowHeight + rowGap) + rowHeight;
   const widget = node.addDOMWidget(name, "custom", panel, {
     socketless: true,
     getValue: () => JSON.stringify(rows),
