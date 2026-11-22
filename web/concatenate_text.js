@@ -9,12 +9,18 @@ function addRowsWidget(node, name, [, options]) {
   let editors = new Map();
 
   function refreshConnections() {
-    for (const input of node.inputs) {
-      const editor = editors.get(input.name);
-      if (!editor) continue;
-      editor.disabled = input.link != null;
-      editor.placeholder = editor.disabled ? "Đang dùng cổng STRING" : "Nhập văn bản";
-    }
+    node.inputs.forEach((input, index) => {
+      const entry = editors.get(input.name);
+      if (!entry) return;
+      const { editor, row } = entry;
+      const linked = input.link != null;
+      const source = linked && node.graph ? node.getInputNode(index) : null;
+      const sourceTitle = linked ? (source?.getTitle?.() || source?.title || "Đang dùng cổng STRING") : "";
+      const value = linked ? sourceTitle : row[1];
+      if (editor.value !== value) editor.value = value;
+      editor.disabled = linked;
+      editor.title = sourceTitle;
+    });
   }
 
   function syncInputs() {
@@ -66,13 +72,15 @@ function addRowsWidget(node, name, [, options]) {
       const editor = document.createElement("textarea");
       editor.style.cssText = "box-sizing:border-box;width:100%;height:100%;resize:none;padding:4px;background:var(--comfy-input-bg,#222);color:inherit;border:1px solid var(--border-color,#555);border-radius:6px";
       editor.value = value;
+      editor.placeholder = "Nhập văn bản";
       editor.setAttribute("aria-label", label);
       editor.oninput = () => {
+        if (editor.disabled) return;
         row[1] = editor.value;
         node.setDirtyCanvas(true, true);
       };
       editor.onchange = () => node.graph?.afterChange?.(node);
-      editors.set(key, editor);
+      editors.set(key, { editor, row });
       line.append(caption, editor, button("×", `Xoá ${label}`, () => editRows(() => rows.splice(index, 1))));
       panel.append(line);
     });
@@ -104,6 +112,7 @@ function addRowsWidget(node, name, [, options]) {
     socketless: true,
     getValue: () => JSON.stringify(rows),
     setValue: restore,
+    onDraw: refreshConnections,
     getMinHeight: height,
     getMaxHeight: height,
   });
