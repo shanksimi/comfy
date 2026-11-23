@@ -26,7 +26,7 @@ class ShankConcatenateText:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "separator": ("STRING", {"default": " ", "multiline": True}),
+                "separator": ("STRING", {"default": " ", "widgetType": "SHANK_CONCATENATE_SEPARATOR"}),
                 "text_rows": ("STRING", {
                     "default": '[["text_1",""],["text_2",""]]',
                     "widgetType": "SHANK_CONCATENATE_ROWS",

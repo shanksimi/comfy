@@ -2,6 +2,31 @@ import { app } from "../../scripts/app.js";
 
 const rowName = /^text_[1-9][0-9]*$/;
 const rowHeight = 24;
+const textInputStyle = "box-sizing:border-box;width:100%;height:100%;resize:none;scrollbar-width:none;padding:2px 5px;font:inherit;line-height:16px;background:var(--comfy-input-bg,#222);color:inherit;border:1px solid var(--border-color,#555);border-radius:6px";
+
+function addSeparatorWidget(node, name, [, options]) {
+  const line = document.createElement("label");
+  line.className = "shank-concatenate-separator";
+  line.style.cssText = `display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:center;box-sizing:border-box;height:${rowHeight}px;padding:0 5px 0 20px;color:var(--input-text,#ddd);font:12px sans-serif`;
+  const caption = document.createElement("span");
+  caption.textContent = "separator";
+  const editor = document.createElement("textarea");
+  editor.rows = 1;
+  editor.wrap = "off";
+  editor.style.cssText = textInputStyle;
+  editor.value = options.default;
+  editor.onchange = () => node.graph?.afterChange?.(node);
+  line.append(caption, editor);
+  const widget = node.addDOMWidget(name, "custom", line, {
+    margin: 0,
+    getValue: () => editor.value,
+    setValue: value => { editor.value = value ?? options.default; },
+    getMinHeight: () => rowHeight,
+    getMaxHeight: () => rowHeight,
+  });
+  widget.computeSize = width => [width, rowHeight];
+  return { widget };
+}
 
 function button(label, title, onClick) {
   const item = document.createElement("button");
@@ -60,7 +85,7 @@ function addRowsWidget(node, name, [, options]) {
     const editor = document.createElement("textarea");
     editor.rows = 1;
     editor.wrap = "off";
-    editor.style.cssText = "box-sizing:border-box;width:100%;height:100%;resize:none;scrollbar-width:none;padding:2px 5px;font:inherit;line-height:16px;background:var(--comfy-input-bg,#222);color:inherit;border:1px solid var(--border-color,#555);border-radius:6px";
+    editor.style.cssText = textInputStyle;
     const caption = document.createElement("span");
     caption.hidden = true;
     caption.style.cssText = "align-self:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
@@ -159,7 +184,7 @@ function addRowsWidget(node, name, [, options]) {
     const next = 1 + rows.reduce((max, [key]) => Math.max(max, Number(key.slice(5))), 0);
     rows.push([`text_${next}`, ""]);
   }));
-  add.style.cssText += `;width:fit-content;max-width:100%;height:${rowHeight}px;box-sizing:border-box`;
+  add.style.cssText += `;width:100%;max-width:100%;height:${rowHeight}px;box-sizing:border-box;padding:0 6px;border-radius:11px;text-align:left`;
   const footer = document.createElement("div");
   footer.className = "shank-concatenate-footer";
   footer.style.cssText = `box-sizing:border-box;width:100%;min-width:0;height:${rowHeight}px;padding:0 5px 0 20px;overflow:hidden`;
@@ -197,6 +222,7 @@ app.registerExtension({
     const style = document.createElement("style");
     style.textContent = `
       .shank-concatenate-row > * { pointer-events: auto; }
+      .lg-node-widgets .shank-concatenate-separator,
       .lg-node-widgets .shank-concatenate-row,
       .lg-node-widgets .shank-concatenate-footer { padding: 0; }
       [data-widget-name]:has(.shank-concatenate-row) > :first-child { opacity: 1; }
@@ -204,6 +230,9 @@ app.registerExtension({
     document.head.append(style);
   },
   getCustomWidgets() {
-    return { SHANK_CONCATENATE_ROWS: addRowsWidget };
+    return {
+      SHANK_CONCATENATE_SEPARATOR: addSeparatorWidget,
+      SHANK_CONCATENATE_ROWS: addRowsWidget,
+    };
   },
 });
