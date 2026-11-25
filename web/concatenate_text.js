@@ -47,7 +47,7 @@ function addRowsWidget(node, name, [, options]) {
     node.inputs.forEach((input, index) => {
       const entry = editors.get(input.name);
       if (!entry) return;
-      const { editor, caption, row } = entry;
+      const { editor, caption, toggle, row } = entry;
       const linked = input.link != null;
       const source = linked && node.graph ? node.getInputNode(index) : null;
       const sourceTitle = linked ? (source?.getTitle?.() || source?.title || "Đang dùng cổng STRING") : "";
@@ -56,6 +56,11 @@ function addRowsWidget(node, name, [, options]) {
       caption.hidden = !linked;
       if (caption.textContent !== sourceTitle) caption.textContent = sourceTitle;
       caption.title = sourceTitle;
+      const enabled = row[2];
+      toggle.setAttribute("aria-checked", String(enabled));
+      toggle.textContent = enabled ? "●" : "○";
+      toggle.style.color = enabled ? "#a7db74" : "var(--descrip-text,#888)";
+      editor.style.opacity = caption.style.opacity = enabled ? "1" : "0.55";
     });
   }
 
@@ -81,7 +86,7 @@ function addRowsWidget(node, name, [, options]) {
   function createEditor(key) {
     const line = document.createElement("div");
     line.className = "shank-concatenate-row";
-    line.style.cssText = `display:grid;grid-template-columns:minmax(0,1fr) 26px;gap:4px;height:${rowHeight}px;padding:0 5px 0 20px;box-sizing:border-box;pointer-events:none;color:var(--input-text,#ddd);font:12px sans-serif`;
+    line.style.cssText = `display:grid;grid-template-columns:18px minmax(0,1fr) 26px;gap:4px;height:${rowHeight}px;padding:0 5px 0 20px;box-sizing:border-box;pointer-events:none;color:var(--input-text,#ddd);font:12px sans-serif`;
     const editor = document.createElement("textarea");
     editor.rows = 1;
     editor.wrap = "off";
@@ -89,10 +94,20 @@ function addRowsWidget(node, name, [, options]) {
     const caption = document.createElement("span");
     caption.hidden = true;
     caption.style.cssText = "align-self:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    const toggle = button("●", "Bật/tắt dòng", () => {
+      const { row } = editors.get(key);
+      node.graph?.beforeChange?.(node);
+      row[2] = !row[2];
+      refreshConnections();
+      node.graph?.afterChange?.(node);
+      node.setDirtyCanvas(true, true);
+    });
+    toggle.setAttribute("role", "switch");
+    toggle.style.cssText = "padding:0;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer";
     const remove = button("×", "Xoá dòng", () => editRows(() => {
       rows = rows.filter(([name]) => name !== key);
     }));
-    line.append(editor, caption, remove);
+    line.append(toggle, editor, caption, remove);
     const widget = node.addDOMWidget(key, "custom", line, {
       serialize: false,
       margin: 0,
@@ -116,7 +131,7 @@ function addRowsWidget(node, name, [, options]) {
       node.setDirtyCanvas(true, true);
     };
     editor.onchange = () => node.graph?.afterChange?.(node);
-    return { editor, caption, remove, widget };
+    return { editor, caption, toggle, remove, widget };
   }
 
   function syncRows() {
@@ -145,6 +160,7 @@ function addRowsWidget(node, name, [, options]) {
       const label = `Text ${index + 1}`;
       entry.editor.placeholder = label;
       entry.editor.setAttribute("aria-label", label);
+      entry.toggle.setAttribute("aria-label", `Bật/tắt ${label}`);
       entry.remove.title = `Xoá dòng ${index + 1}`;
       entry.remove.setAttribute("aria-label", entry.remove.title);
 
@@ -173,16 +189,17 @@ function addRowsWidget(node, name, [, options]) {
     } catch {
       return;
     }
-    if (!Array.isArray(saved) || !saved.every(row => Array.isArray(row) && row.length === 2
+    if (!Array.isArray(saved) || !saved.every(row => Array.isArray(row)
+      && (row.length === 2 || (row.length === 3 && typeof row[2] === "boolean"))
       && typeof row[0] === "string" && rowName.test(row[0]) && typeof row[1] === "string")
       || new Set(saved.map(([key]) => key)).size !== saved.length) return;
-    rows = saved;
+    rows = saved.map(([key, value, enabled = true]) => [key, value, enabled]);
     syncRows();
   }
 
   const add = button("+ Thêm dòng", "Thêm dòng văn bản", () => editRows(() => {
     const next = 1 + rows.reduce((max, [key]) => Math.max(max, Number(key.slice(5))), 0);
-    rows.push([`text_${next}`, ""]);
+    rows.push([`text_${next}`, "", true]);
   }));
   add.style.cssText += `;width:100%;max-width:100%;height:${rowHeight}px;box-sizing:border-box;padding:0 6px;border-radius:11px;text-align:left`;
   const footer = document.createElement("div");

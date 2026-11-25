@@ -31,7 +31,7 @@ Sau đó khởi động lại ComfyUI.
 |------|-------|
 | `Load Image + Metadata` | Load ảnh + đọc metadata (A1111/ComfyUI), chọn nhiều ảnh, vẽ mask. Output: IMAGE, MASK, POSITIVE, NEGATIVE, METADATA, FILENAME, FOLDER. |
 | `Shank Wildcard Encode` | Thay thế các mẫu `{a|b|c}` trong prompt bằng giá trị ngẫu nhiên. Hỗ trợ seed và ô hiển thị kết quả. |
-| `Concatenate Text (shanksimi)` | Nối văn bản từ trên xuống, bỏ qua dòng trống. Thêm hoặc xoá từng dòng, nhập trực tiếp hoặc nối từ cổng STRING. |
+| `Concatenate Text (shanksimi)` | Nối văn bản từ trên xuống, bỏ qua dòng trống. Thêm, xoá hoặc bật/tắt từng dòng, nhập trực tiếp hoặc nối từ cổng STRING. |
 | `Shank Seed` | Cung cấp seed cho KSampler: fixed, random, increment, decrement. |
 
 ## Cấu trúc repo
