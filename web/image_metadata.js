@@ -5,14 +5,21 @@ app.registerExtension({
   nodeCreated(node) {
     if (node.comfyClass !== "ShankMetadata") return;
     const reportInputs = node.inputs?.filter(input => ["loras", "lllite_report"].includes(input.name)) ?? [];
+    const denoiseWidget = node.widgets?.find(widget => widget.name === "denoise");
     function showDenoiseInput() {
-      if (!node.widgets?.some(widget => widget.name === "denoise")) return;
+      if (!denoiseWidget) return;
 
       const input = node.inputs?.find(slot => slot.name === "denoise");
-      if (input) {
-        input.alwaysVisible = true;
-      } else {
-        node.addInput("denoise", "FLOAT", { widget: { name: "denoise" }, alwaysVisible: true });
+      if (!input) {
+        node.addInput("denoise", "FLOAT");
+        return;
+      }
+      if (input.widget) {
+        // Widget sockets can be hidden by the frontend. Keep the numeric
+        // widget as a fallback and expose the existing socket in the input list.
+        input.widget = undefined;
+        input._widget = undefined;
+        input.pos = undefined;
       }
     }
 
