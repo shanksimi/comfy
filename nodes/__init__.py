@@ -14,6 +14,7 @@ from .ultralytics_detector import ShankUltralyticsDetectorProvider
 from .sam_loader import ShankSAMLoader
 from .image_saver_simple import ShankMetadata, ShankImageSaverSimple
 from .image_comparer import ShankImageComparer
+from .image_resize import ShankImageResize
 from .power_lora_loader import ShankPowerLoraLoader
 from .basic_info import ShankBasicInfo
 from .concatenate_text import ShankConcatenateText
@@ -58,6 +59,9 @@ NODE_DISPLAY_NAME_MAPPINGS["ShankImageSaverSimple"] = "Image Saver Simple (shank
 
 NODE_CLASS_MAPPINGS["ShankImageComparer"] = ShankImageComparer
 NODE_DISPLAY_NAME_MAPPINGS["ShankImageComparer"] = "Image Comparer (shanksimi)"
+
+NODE_CLASS_MAPPINGS["ShankImageResize"] = ShankImageResize
+NODE_DISPLAY_NAME_MAPPINGS["ShankImageResize"] = "Image Resize (shanksimi)"
 
 NODE_CLASS_MAPPINGS["ShankPowerLoraLoader"] = ShankPowerLoraLoader
 NODE_DISPLAY_NAME_MAPPINGS["ShankPowerLoraLoader"] = "Power Lora Loader (shanksimi)"
