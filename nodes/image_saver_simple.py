@@ -87,7 +87,7 @@ _METADATA_TOOLTIPS = {
     "cfg": "Mức độ bám conditioning khi lấy mẫu.",
     "sampler_name": "Tên sampler dạng chuỗi.",
     "scheduler_name": "Tên scheduler dạng chuỗi.",
-    "denoise": "Mức khử nhiễu dùng khi tạo ảnh.",
+    "denoise": "Mức khử nhiễu dùng khi tạo ảnh. Có thể nối từ cổng denoise của Basic Info.",
     "clip_skip": "Số lớp CLIP cuối được bỏ qua. Giá trị 0 giữ nguyên.",
     "additional_hashes": "Hash bổ sung, phân cách bằng dấu phẩy. Ví dụ: MyLoRA:FF735FF83F98.",
     "download_civitai_data": "Tải và lưu đệm thông tin Civitai để bổ sung metadata, gồm strength LoRA khi có.",
