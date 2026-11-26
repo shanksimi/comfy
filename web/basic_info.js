@@ -21,9 +21,13 @@ app.registerExtension({
       return result;
     };
 
+    const denoise = node.outputs?.find(output => output.name === "denoise");
     const configure = node.onConfigure;
     node.onConfigure = function (...args) {
       const result = configure?.apply(this, args);
+      if (denoise && !this.outputs.some(output => output.name === denoise.name)) {
+        this.addOutput(denoise.name, denoise.type);
+      }
       sync();
       return result;
     };

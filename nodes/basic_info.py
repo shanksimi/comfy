@@ -42,10 +42,12 @@ class ShankBasicInfo:
                 "default": "Custom",
                 "tooltip": "Preset kích thước gợi ý theo tỷ lệ gần đúng và nhóm model. Custom dùng width và height nhập tay.",
             }),
+            "denoise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01,
+                                  "tooltip": "Mức khử nhiễu cho KSampler. Giảm giá trị để giữ lại nhiều hơn từ latent đầu vào."}),
         }}
 
-    RETURN_TYPES = ("INT", "INT", "FLOAT", "INT", "FLOAT", KSampler.SAMPLERS, "STRING", KSampler.SCHEDULERS, "STRING")
-    RETURN_NAMES = ("width", "height", "CFG", "steps", "upscale factor", "sampler", "sampler_name", "scheduler", "scheduler_name")
+    RETURN_TYPES = ("INT", "INT", "FLOAT", "INT", "FLOAT", KSampler.SAMPLERS, "STRING", KSampler.SCHEDULERS, "STRING", "FLOAT")
+    RETURN_NAMES = ("width", "height", "CFG", "steps", "upscale factor", "sampler", "sampler_name", "scheduler", "scheduler_name", "denoise")
     OUTPUT_TOOLTIPS = (
         "Chiều rộng ảnh theo pixel.",
         "Chiều cao ảnh theo pixel.",
@@ -56,8 +58,9 @@ class ShankBasicInfo:
         "Tên sampler dạng văn bản để ghi metadata.",
         "Lựa chọn scheduler để nối vào KSampler.",
         "Tên scheduler dạng văn bản để ghi metadata.",
+        "Mức khử nhiễu để nối vào denoise của KSampler.",
     )
 
-    def get_values(self, width, height, cfg, steps, upscale_factor, sampler_name, scheduler, aspect_ratio="Custom"):
+    def get_values(self, width, height, cfg, steps, upscale_factor, sampler_name, scheduler, aspect_ratio="Custom", denoise=1.0):
         width, height = ASPECT_PRESETS.get(aspect_ratio, (width, height))
-        return width, height, cfg, steps, upscale_factor, sampler_name, sampler_name, scheduler, scheduler
+        return width, height, cfg, steps, upscale_factor, sampler_name, sampler_name, scheduler, scheduler, denoise
